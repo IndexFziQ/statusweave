@@ -1,0 +1,30 @@
+[
+  {
+    "id": "example-api",
+    "name": "Example HTTP API",
+    "type": "http",
+    "url": "https://api.example.com/v1/quota",
+    "auth": { "type": "bearer-keychain", "origin": "https://api.example.com" },
+    "interval": 600,
+    "metrics": [
+      { "label": "Daily limit", "kind": "percent", "path": "$.daily.used_percent", "resetPath": "$.daily.reset_after_seconds" },
+      { "label": "Balance", "kind": "value", "path": "$.balance", "unit": " USD" }
+    ]
+  },
+  {
+    "name": "Example CLI (JSON)",
+    "type": "command",
+    "command": "my-cli quota --json",
+    "metrics": [
+      { "label": "Weekly limit", "kind": "percent", "path": "$.weekly.pct" }
+    ]
+  },
+  {
+    "name": "Example CLI (text)",
+    "type": "command",
+    "command": "my-cli status",
+    "metrics": [
+      { "label": "Usage", "kind": "percent", "pattern": "(\\d+(?:\\.\\d+)?)% used" }
+    ]
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "version": 3,
+  "colors": {
+    "background": "#0a0d14",
+    "panel": "#10141f",
+    "panelRaised": "#151a28",
+    "panelInset": "#0d1119",
+    "ink": "#e8edf6",
+    "inkSecondary": "#c3ccd9",
+    "muted": "#aab4c6",
+    "faint": "#6b7690",
+    "line": "#2a3347",
+    "lineHard": "#3d4a63",
+    "healthy": "#4be08c",
+    "active": "#3fd6e8",
+    "warning": "#f0b83c",
+    "critical": "#f0534f",
+    "offline": "#69758d",
+    "unknown": "#9d8df1",
+    "pink": "#e879c5",
+    "shadow": "#04060a"
+  },
+  "themes": {
+    "dark": {
+      "background": "#0a0d14",
+      "panel": "#10141f",
+      "panelRaised": "#151a28",
+      "panelInset": "#0d1119",
+      "ink": "#e8edf6",
+      "inkSecondary": "#c3ccd9",
+      "muted": "#aab4c6",
+      "faint": "#6b7690",
+      "line": "#2a3347",
+      "lineHard": "#3d4a63",
+      "healthy": "#4be08c",
+      "active": "#3fd6e8",
+      "warning": "#f0b83c",
+      "critical": "#f0534f",
+      "offline": "#69758d",
+      "unknown": "#9d8df1",
+      "pink": "#e879c5",
+      "shadow": "#04060a"
+    },
+    "light": {
+      "background": "#e9edf2",
+      "panel": "#f7f9fb",
+      "panelRaised": "#ffffff",
+      "panelInset": "#e2e7ee",
+      "ink": "#17202e",
+      "inkSecondary": "#2e3a4e",
+      "muted": "#4d5a70",
+      "faint": "#64738a",
+      "line": "#c6cfdc",
+      "lineHard": "#8e9cb3",
+      "healthy": "#0d7a43",
+      "active": "#0871a0",
+      "warning": "#8a5a00",
+      "critical": "#c02824",
+      "offline": "#64738a",
+      "unknown": "#6a4fd0",
+      "pink": "#a82f85",
+      "shadow": "#17202e"
+    }
+  },
+  "meter": {
+    "segments": 10,
+    "warningAt": 50,
+    "criticalAt": 80
+  },
+  "characters": {
+    "lampOn": "■",
+    "lampOff": "□",
+    "barFull": "█",
+    "barEmpty": "░"
+  }
+}

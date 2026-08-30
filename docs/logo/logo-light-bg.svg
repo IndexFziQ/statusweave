@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- StatusWeave logo on white (app icon / light contexts) -->
+  <rect width="1024" height="1024" rx="220" fill="#ffffff"/>
+  <g fill="none" stroke="#111111" stroke-width="58" stroke-linecap="round">
+    <path d="M 677 226.2 A 330 330 0 1 0 815.8 383.1"/>
+  </g>
+  <circle cx="739.4" cy="307.3" r="54" fill="#111111"/>
+  <path d="M 333 525 L 466 525 L 499 383 L 549 629 L 593 525 L 703 525"
+        fill="none" stroke="#111111" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

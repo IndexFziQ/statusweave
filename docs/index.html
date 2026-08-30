@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StatusWeave — Local-first macOS AI coding usage monitor</title>
+  <meta name="description" content="An open-source, local-first macOS monitor for supported AI coding usage, plus Mac system health.">
+  <meta name="theme-color" content="#0a0d14">
+  <link rel="canonical" href="https://indexfziq.github.io/statusweave/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="StatusWeave — The Local Console">
+  <meta property="og:description" content="Supported AI coding usage and Mac system health in one local console.">
+  <meta name="twitter:card" content="summary_large_image">
+  <script>
+    try {
+      const savedTheme = localStorage.getItem('sw-theme');
+      document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    } catch { document.documentElement.dataset.theme = 'dark'; }
+  </script>
+  <style>
+    /* ============ TOKENS ============ */
+    :root {
+      color-scheme: dark;
+      --bg: #0a0d14;
+      --panel: #10141f;
+      --panel-2: #151a28;
+      --ink: #e8edf6;
+      --muted: #aab4c6;
+      --line: #2a3347;
+      --line-hard: #3d4a63;
+      --green: #4be08c;
+      --cyan: #3fd6e8;
+      --amber: #f0b83c;
+      --red: #f0534f;
+      --violet: #9d8df1;
+      --shadow: #04060a;
+      --faint: #5f6c84;
+      --grid-color: rgba(63, 214, 232, .03);
+      --glow-cyan: rgba(63, 214, 232, .07);
+      --glow-violet: rgba(157, 141, 241, .06);
+      --bar-empty: #232b3d;
+      --lamp-dim: #39435a;
+      --terminal: #070a11;
+      --terminal-ink: #d4ddec;
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      --px-shadow: 4px 4px 0 var(--shadow);
+      --px-shadow-sm: 3px 3px 0 var(--shadow);
+    }
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg: #e9edf2;
+      --panel: #f7f9fb;
+      --panel-2: #ffffff;
+      --ink: #17202e;
+      --muted: #4d5a70;
+      --line: #c6cfdc;
+      --line-hard: #8e9cb3;
+      --green: #0d7a43;
+      --cyan: #0871a0;
+      --amber: #8a5a00;
+      --red: #c02824;
+      --violet: #6a4fd0;
+      --shadow: #17202e;
+      --faint: #64738a;
+      --grid-color: rgba(23,32,46,.045);
+      --glow-cyan: rgba(8,113,160,.045);
+      --glow-violet: rgba(106,79,208,.04);
+      --bar-empty: #d3dae4;
+      --lamp-dim: #64738a;
+      --px-shadow: 4px 4px 0 rgba(23,32,46,.82);
+      --px-shadow-sm: 3px 3px 0 rgba(23,32,46,.82);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px),
+        radial-gradient(900px 460px at 12% -8%, var(--glow-cyan), transparent 70%),
+        radial-gradient(760px 420px at 92% 2%, var(--glow-violet), transparent 68%);
+      background-size: 32px 32px, 32px 32px, auto, auto;
+      color: var(--ink);
+      font: 15px/1.65 var(--mono);
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: var(--cyan); color: #06121a; }
+    a { color: inherit; }
+    a:focus-visible, button:focus-visible {
+      outline: 2px dashed var(--cyan);
+      outline-offset: 3px;
+    }
+    .wrap { width: min(1080px, calc(100% - 40px)); margin: 0 auto; }
+
+    /* ============ PIXEL PRIMITIVES ============ */
+    .px-panel {
+      background: var(--panel);
+      border: 2px solid var(--line-hard);
+      box-shadow: var(--px-shadow);
+    }
+    .lamp {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border: 1px solid rgba(0,0,0,.55);
+      vertical-align: -1px;
+    }
+    .lamp.green { background: var(--green); box-shadow: 0 0 8px rgba(75,224,140,.8); }
+    .lamp.amber { background: var(--amber); box-shadow: 0 0 8px rgba(240,184,60,.7); }
+    .lamp.cyan  { background: var(--cyan);  box-shadow: 0 0 8px rgba(63,214,232,.8); }
+    .lamp.dim   { background: var(--lamp-dim); }
+    html[data-theme="light"] .lamp { box-shadow: none; }
+    .statusline .lamp.green { animation: blink-soft 2.8s steps(2) infinite; }
+    .statusline .lamp.cyan { animation: blink-soft 3.2s steps(2) infinite; }
+    @keyframes blink-soft { 0%,60% { opacity: 1; } 61%,100% { opacity: .45; } }
+
+    /* segmented HP/quota bar */
+    .bar {
+      height: 12px;
+      border: 2px solid var(--line-hard);
+      background:
+        repeating-linear-gradient(90deg, var(--green) 0 10px, transparent 10px 14px) left/70% 100% no-repeat,
+        repeating-linear-gradient(90deg, var(--bar-empty) 0 10px, transparent 10px 14px);
+      image-rendering: pixelated;
+    }
+    .bar.b-cyan { background:
+        repeating-linear-gradient(90deg, var(--cyan) 0 10px, transparent 10px 14px) left/52% 100% no-repeat,
+        repeating-linear-gradient(90deg, var(--bar-empty) 0 10px, transparent 10px 14px); }
+    .bar.b-amber { background:
+        repeating-linear-gradient(90deg, var(--amber) 0 10px, transparent 10px 14px) left/34% 100% no-repeat,
+        repeating-linear-gradient(90deg, var(--bar-empty) 0 10px, transparent 10px 14px); }
+
+    .tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 10px;
+      border: 2px solid var(--line-hard);
+      background: var(--panel-2);
+      box-shadow: var(--px-shadow-sm);
+      font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--green);
+    }
+    .kicker {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--cyan);
+      font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+    }
+    .kicker::before { content: "▸"; color: var(--green); }
+
+    /* ============ NAV ============ */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 72px;
+    }
+    .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 700; letter-spacing: .04em; }
+    .brand .glyph { image-rendering: pixelated; }
+    .brand em { font-style: normal; color: var(--cyan); }
+    .nav-links { display: flex; align-items: center; gap: 22px; color: var(--muted); font-size: 13px; }
+    .nav-links a { text-decoration: none; padding: 4px 2px; }
+    .nav-links a:hover { color: var(--green); text-shadow: 0 0 8px rgba(75,224,140,.5); }
+    html[data-theme="light"] .nav-links a:hover { text-shadow: none; }
+    .theme-toggle {
+      min-width: 34px; min-height: 32px; padding: 3px 8px; color: var(--cyan); background: var(--panel-2);
+      border: 2px solid var(--line-hard); box-shadow: var(--px-shadow-sm); font: 700 13px var(--mono); cursor: pointer;
+    }
+
+    /* ============ HERO ============ */
+    .hero { padding: 64px 0 88px; text-align: center; position: relative; }
+    .statusline {
+      display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 18px;
+      margin-bottom: 30px;
+      color: var(--muted); font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    }
+    .statusline span { display: inline-flex; align-items: center; gap: 7px; }
+    h1 {
+      margin: 22px auto 20px; max-width: 860px;
+      font-size: clamp(38px, 7vw, 72px); line-height: 1.04; letter-spacing: -.02em;
+      text-transform: uppercase;
+    }
+    h1 .accent { color: var(--green); text-shadow: 3px 3px 0 rgba(75,224,140,.25); }
+    .lede { max-width: 640px; margin: 0 auto; color: var(--muted); font-size: clamp(15px, 1.8vw, 18px); }
+    .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      min-height: 48px; padding: 0 22px;
+      border: 2px solid var(--line-hard);
+      background: var(--panel-2); color: var(--ink);
+      box-shadow: var(--px-shadow);
+      text-decoration: none; font: 700 14px var(--mono); letter-spacing: .04em;
+      cursor: pointer;
+      transition: transform .12s steps(2), box-shadow .12s steps(2);
+    }
+    .btn:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--shadow); }
+    .btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--shadow); }
+    .btn.primary { background: var(--green); border-color: var(--green); color: #06130c; }
+    /* decorative pixel sprites flanking hero */
+    .sprite { position: absolute; opacity: .8; image-rendering: pixelated; }
+    .sprite.s1 { left: 4%; top: 18%; animation: float-y 5s steps(5) infinite; }
+    .sprite.s2 { right: 5%; top: 30%; animation: float-y 6s steps(6) infinite reverse; }
+    .sprite.s3 { left: 10%; bottom: 8%; animation: float-y 7s steps(7) infinite; }
+    @keyframes float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+    /* HUD strip under hero: mock console readout */
+    .hud {
+      margin: 56px auto 0; max-width: 760px; text-align: left;
+      padding: 18px 20px;
+    }
+    .hud-row { display: grid; grid-template-columns: 92px 1fr 56px; gap: 12px; align-items: center; padding: 6px 0; font-size: 12px; }
+    .hud-row + .hud-row { border-top: 1px dashed var(--line); }
+    .hud-row .name { color: var(--muted); letter-spacing: .08em; }
+    .hud-row .val { text-align: right; color: var(--green); }
+    .hud-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; border-bottom: 2px solid var(--line-hard); padding-bottom: 10px; margin-bottom: 6px; }
+
+    /* ============ SECTIONS ============ */
+    section { padding: 70px 0; }
+    h2 { margin: 10px 0 14px; font-size: clamp(26px, 4.4vw, 42px); line-height: 1.12; letter-spacing: -.01em; text-transform: uppercase; }
+    .section-lede { max-width: 640px; margin: 0 0 34px; color: var(--muted); }
+
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card { padding: 22px; position: relative; }
+    .card .icon { display: block; margin-bottom: 14px; }
+    .card h3 { margin: 0 0 8px; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; }
+    .card p { margin: 0; color: var(--muted); font-size: 13px; }
+    .card:hover { border-color: var(--green); }
+
+    /* ============ TERMINAL ============ */
+    .terminal { overflow: hidden; background: var(--terminal); border: 2px solid var(--line-hard); box-shadow: var(--px-shadow); }
+    .terminal-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px;
+      background: var(--panel-2); border-bottom: 2px solid var(--line-hard);
+      color: var(--muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    }
+    .terminal-head .dots { display: inline-flex; gap: 5px; margin-right: 6px; }
+    .terminal-head .dots i { width: 9px; height: 9px; border: 1px solid rgba(0,0,0,.5); }
+    .terminal-head .dots i:nth-child(1) { background: var(--red); }
+    .terminal-head .dots i:nth-child(2) { background: var(--amber); }
+    .terminal-head .dots i:nth-child(3) { background: var(--green); }
+    pre { margin: 0; padding: 20px; overflow-x: auto; color: var(--terminal-ink); font: 13px/1.8 var(--mono); }
+    pre .p { color: var(--green); }
+    pre .c { color: #748198; }
+    pre .k { color: var(--cyan); }
+    .split { display: grid; grid-template-columns: .85fr 1.15fr; gap: 36px; align-items: center; }
+    .copy-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 14px 14px; }
+    .copy-hint { color: #748198; font-size: 11px; }
+    .copy-btn {
+      min-height: 38px; padding: 0 16px;
+      background: var(--green); color: #06130c;
+      border: 2px solid var(--green);
+      box-shadow: var(--px-shadow-sm);
+      font: 700 12px var(--mono); letter-spacing: .06em; cursor: pointer;
+      transition: transform .12s steps(2), box-shadow .12s steps(2);
+    }
+    .copy-btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--shadow); }
+    .copy-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--shadow); }
+    .copy-btn.done { background: var(--panel-2); color: var(--green); border-color: var(--green); }
+
+    /* ============ DELIVERY ============ */
+    .status-tag { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 12px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+    .status-tag.ok { color: var(--green); }
+    .status-tag.wait { color: var(--amber); }
+    .status-tag.soon { color: var(--cyan); }
+
+    /* ============ PRIVACY / LICENSE ============ */
+    .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .open-box {
+      display: flex; align-items: center; justify-content: space-between; gap: 30px;
+      padding: 34px;
+      background:
+        linear-gradient(rgba(75,224,140,.05) 1px, transparent 1px) 0 0/100% 6px,
+        var(--panel);
+    }
+    .open-box h2 { margin-top: 0; }
+    .open-box p { max-width: 620px; margin: 0; color: var(--muted); font-size: 14px; }
+    .license-badge {
+      flex: 0 0 auto; padding: 14px 20px;
+      border: 2px solid var(--green); color: var(--green);
+      box-shadow: var(--px-shadow);
+      font-weight: 700; letter-spacing: .1em;
+    }
+
+    .final { text-align: center; padding: 96px 0; }
+    .final h2 { max-width: 620px; margin-left: auto; margin-right: auto; }
+
+    footer {
+      display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+      padding: 22px 0 40px; border-top: 2px solid var(--line-hard);
+      color: var(--faint); font-size: 12px;
+    }
+
+    /* ============ RESPONSIVE ============ */
+    @media (max-width: 860px) {
+      .nav-links a:not(:last-child) { display: none; }
+      .grid { grid-template-columns: 1fr 1fr; }
+      .split { grid-template-columns: 1fr; }
+      .sprite { display: none; }
+    }
+    @media (max-width: 560px) {
+      .wrap { width: calc(100% - 28px); }
+      .hero { padding: 44px 0 60px; }
+      section { padding: 52px 0; }
+      .grid, .duo { grid-template-columns: 1fr; }
+      .hud-row { grid-template-columns: 74px 1fr 48px; }
+      .open-box { flex-direction: column; align-items: flex-start; padding: 24px; }
+      footer { flex-direction: column; }
+    }
+
+    /* ============ REDUCED MOTION ============ */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .statusline .lamp.green, .statusline .lamp.cyan, .sprite { animation: none; }
+      .btn, .copy-btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="wrap" aria-label="Main navigation">
+    <a class="brand" href="#top">
+      <svg class="glyph" width="28" height="28" viewBox="0 0 14 14" shape-rendering="crispEdges" aria-hidden="true">
+        <rect x="0" y="0" width="14" height="14" fill="#10141f"/>
+        <rect x="1" y="1" width="12" height="12" fill="none" stroke="#3d4a63"/>
+        <rect x="2" y="6" width="2" height="2" fill="#4be08c"/>
+        <rect x="4" y="4" width="2" height="4" fill="#4be08c"/>
+        <rect x="6" y="2" width="2" height="6" fill="#3fd6e8"/>
+        <rect x="8" y="5" width="2" height="3" fill="#3fd6e8"/>
+        <rect x="10" y="3" width="2" height="5" fill="#f0b83c"/>
+      </svg>
+      <span>STATUS<em>WEAVE</em></span>
+    </a>
+    <div class="nav-links">
+      <a href="#agent">Use with AI</a>
+      <a href="#features">Features</a>
+      <a href="#delivery">Delivery</a>
+      <a href="#quick-start">Install</a>
+      <a href="https://github.com/IndexFziQ/statusweave">GitHub ↗</a>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light theme" aria-pressed="false">◐</button>
+    </div>
+  </nav>
+
+  <main id="top">
+    <!-- ================= HERO ================= -->
+    <header class="hero wrap">
+      <svg class="sprite s1" width="24" height="24" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="3" y="0" width="2" height="2" fill="#3fd6e8"/><rect x="1" y="2" width="6" height="2" fill="#3fd6e8"/><rect x="3" y="4" width="2" height="2" fill="#3fd6e8"/><rect x="3" y="6" width="2" height="2" fill="#2a3347"/></svg>
+      <svg class="sprite s2" width="24" height="24" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="0" y="3" width="8" height="2" fill="#4be08c"/><rect x="3" y="0" width="2" height="8" fill="#4be08c"/></svg>
+      <svg class="sprite s3" width="24" height="24" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="2" height="2" fill="#f0b83c"/><rect x="5" y="1" width="2" height="2" fill="#f0b83c"/><rect x="3" y="3" width="2" height="2" fill="#f0b83c"/><rect x="1" y="5" width="2" height="2" fill="#f0b83c"/><rect x="5" y="5" width="2" height="2" fill="#f0b83c"/></svg>
+
+      <div class="statusline" aria-label="Project status">
+        <span><i class="lamp green"></i>Local-first</span>
+        <span><i class="lamp green"></i>MIT license</span>
+        <span><i class="lamp cyan"></i>npm package live</span>
+        <span><i class="lamp dim"></i>No telemetry</span>
+      </div>
+
+      <span class="tag">AI usage monitor · macOS</span>
+      <h1>Your AI coding usage.<br><span class="accent">One local console.</span></h1>
+      <p class="lede">StatusWeave is a local-first macOS monitor for membership and usage status from supported AI coding services — plus your Mac's system health — rendered on a localhost dashboard you control, with a read-only REST API your coding agent can query.</p>
+      <div class="actions">
+        <a class="btn primary" href="#quick-start">▶ Install with npx</a>
+        <a class="btn" href="https://github.com/IndexFziQ/statusweave">View on GitHub ↗</a>
+      </div>
+
+      <div class="hud px-panel" aria-hidden="true">
+        <div class="hud-head"><span>statusweave · live readout (demo)</span><span>localhost:8787</span></div>
+        <div class="hud-row"><span class="name">CPU</span><span class="bar"></span><span class="val">70%</span></div>
+        <div class="hud-row"><span class="name">MEMORY</span><span class="bar b-cyan"></span><span class="val" style="color:var(--cyan)">52%</span></div>
+        <div class="hud-row"><span class="name">GPU</span><span class="bar b-amber"></span><span class="val" style="color:var(--amber)">34%</span></div>
+        <div class="hud-row"><span class="name">AI QUOTA</span><span class="bar b-cyan"></span><span class="val" style="color:var(--cyan)">52%</span></div>
+      </div>
+    </header>
+
+    <!-- ================= AGENT ================= -->
+    <section id="agent">
+      <div class="wrap split">
+        <div>
+          <span class="kicker">Side quest · agent-assisted install</span>
+          <h2>One sentence to your agent.</h2>
+          <p class="section-lede">Hand Claude Code, Codex, or Kimi a single prompt: read the install contract, run the npm install, and open the local monitor. You complete any official provider login yourself; the agent does not control your accounts and does not automatically discover every service you use.</p>
+        </div>
+        <div class="terminal">
+          <div class="terminal-head"><span class="dots"><i></i><i></i><i></i></span>prompt.txt — paste into your agent</div>
+          <pre id="agent-prompt" style="white-space:pre-wrap">请安装并启动 https://github.com/IndexFziQ/statusweave。先阅读仓库里的 AGENT_INSTALL.md，再按文档执行 npm 安装（npx statusweave），完成环境检查、Claude Code/Codex/Kimi 检测、监控设置、启动和验证。已有官方 CLI 登录直接复用；如果需要登录、MFA、账号选择、目录 Trust 或终端 [y/N] 确认，必须停下来交给我本人操作。不要在对话、日志或非官方域名中输出或上传凭据。完成后打开 http://127.0.0.1:8787，并报告每家的实际可用状态。</pre>
+          <div class="copy-row">
+            <span class="copy-hint">// install shortcut; logins remain yours</span>
+            <button id="copy-prompt" class="copy-btn" type="button" aria-live="polite">[ COPY PROMPT ]</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= FEATURES ================= -->
+    <section id="features">
+      <div class="wrap">
+        <span class="kicker">Quest log · built-in sources</span>
+        <h2>AI usage front and center. System health built in.</h2>
+        <p class="section-lede">Supported AI coding usage appears after explicit setup of the providers you choose; Mac system health works immediately, no account required.</p>
+        <div class="grid">
+          <article class="card px-panel">
+            <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="6" height="6" fill="none" stroke="#4be08c"/><rect x="3" y="3" width="2" height="2" fill="#4be08c"/><rect x="3" y="0" width="2" height="1" fill="#4be08c"/><rect x="3" y="7" width="2" height="1" fill="#4be08c"/><rect x="0" y="3" width="1" height="2" fill="#4be08c"/><rect x="7" y="3" width="1" height="2" fill="#4be08c"/></svg></span>
+            <h3>System health</h3>
+            <p>CPU, memory, swap, disk, load, GPU, processes, and per-app memory — the macOS metrics already supported today.</p>
+          </article>
+          <article class="card px-panel">
+            <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="2" y="0" width="4" height="1" fill="#3fd6e8"/><rect x="1" y="1" width="6" height="2" fill="#3fd6e8"/><rect x="1" y="3" width="2" height="2" fill="#3fd6e8"/><rect x="5" y="3" width="2" height="2" fill="#3fd6e8"/><rect x="1" y="5" width="6" height="2" fill="#3fd6e8"/><rect x="2" y="7" width="4" height="1" fill="#3fd6e8"/></svg></span>
+            <h3>Claude usage</h3>
+            <p>Limit windows when available, plus local token statistics from the supported Claude integration after opt-in.</p>
+          </article>
+          <article class="card px-panel">
+            <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="0" y="1" width="3" height="1" fill="#9d8df1"/><rect x="5" y="1" width="3" height="1" fill="#9d8df1"/><rect x="0" y="2" width="1" height="4" fill="#9d8df1"/><rect x="7" y="2" width="1" height="4" fill="#9d8df1"/><rect x="0" y="6" width="3" height="1" fill="#9d8df1"/><rect x="5" y="6" width="3" height="1" fill="#9d8df1"/><rect x="3" y="3" width="2" height="2" fill="#9d8df1"/></svg></span>
+            <h3>Codex usage</h3>
+            <p>Available quota windows and local token statistics after explicit Codex monitoring setup.</p>
+          </article>
+          <article class="card px-panel">
+            <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="0" width="2" height="3" fill="#f0b83c"/><rect x="5" y="0" width="2" height="3" fill="#f0b83c"/><rect x="2" y="3" width="4" height="2" fill="#f0b83c"/><rect x="1" y="5" width="2" height="3" fill="#f0b83c"/><rect x="5" y="5" width="2" height="3" fill="#f0b83c"/></svg></span>
+            <h3>Kimi usage</h3>
+            <p>Available membership-limit signals and local token statistics after explicit Kimi monitoring setup.</p>
+          </article>
+          <article class="card px-panel">
+            <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="0" y="0" width="8" height="1" fill="#3fd6e8"/><rect x="0" y="0" width="1" height="8" fill="#3fd6e8"/><rect x="7" y="0" width="1" height="8" fill="#3fd6e8"/><rect x="0" y="7" width="8" height="1" fill="#3fd6e8"/><rect x="1" y="3" width="6" height="1" fill="#3fd6e8"/><rect x="3" y="1" width="1" height="6" fill="#3fd6e8"/></svg></span>
+            <h3>Read-only REST API</h3>
+            <p>JSON endpoints on localhost that coding agents can read — values and percentages via simple GET responses and JSON paths.</p>
+          </article>
+          <article class="card px-panel">
+            <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="1" height="1" fill="#4be08c"/><rect x="2" y="2" width="1" height="1" fill="#4be08c"/><rect x="3" y="3" width="1" height="1" fill="#4be08c"/><rect x="2" y="4" width="1" height="1" fill="#4be08c"/><rect x="1" y="5" width="1" height="1" fill="#4be08c"/><rect x="5" y="5" width="3" height="1" fill="#4be08c"/></svg></span>
+            <h3>Any local command</h3>
+            <p>Turn command output into a monitored value with JSON paths or regex, as an opt-in custom source.</p>
+          </article>
+        </div>
+        <p style="color:var(--faint);font-size:12px;margin-top:18px">// AI service integrations depend on upstream behavior and may change as those services evolve.</p>
+      </div>
+    </section>
+
+    <!-- ================= CUSTOMIZE ================= -->
+    <section id="customize">
+      <div class="wrap split">
+        <div>
+          <span class="kicker">Crafting · bring your own source</span>
+          <h2>Mod your own console.</h2>
+          <p class="section-lede">Add an HTTP endpoint or local command without rebuilding StatusWeave. Authenticated HTTPS JSON APIs keep their Bearer key in macOS Keychain — never in agent chat or configuration files.</p>
+        </div>
+        <div class="terminal">
+          <div class="terminal-head"><span class="dots"><i></i><i></i><i></i></span>~/.statusweave/providers.json</div>
+          <pre>[
+  {
+    <span class="k">"name"</span>: <span class="p">"My API"</span>,
+    <span class="k">"type"</span>: <span class="p">"http"</span>,
+    <span class="k">"url"</span>: <span class="p">"https://api.example.com/quota"</span>,
+    <span class="k">"metrics"</span>: [
+      { <span class="k">"label"</span>: <span class="p">"Daily"</span>, <span class="k">"kind"</span>: <span class="p">"percent"</span>,
+        <span class="k">"path"</span>: <span class="p">"$.daily.used_percent"</span> }
+    ]
+  }
+]</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= DELIVERY ================= -->
+    <section id="delivery">
+      <div class="wrap">
+        <span class="kicker">Save points · delivery status</span>
+        <h2>What is playable today.</h2>
+        <p class="section-lede">Honest checkpoint markers — no vaporware on this map.</p>
+        <div class="grid">
+          <article class="card px-panel">
+            <span class="status-tag ok"><i class="lamp green"></i>Available</span>
+            <h3>HTML dashboard + REST</h3>
+            <p>One npx command starts the localhost dashboard and read-only JSON endpoints your coding agent can query.</p>
+          </article>
+          <article class="card px-panel">
+            <span class="status-tag ok"><i class="lamp green"></i>Available</span>
+            <h3>npm package</h3>
+            <p>Published on npm. <code>npx statusweave</code> is the recommended one-line install; no clone or build step needed.</p>
+          </article>
+          <article class="card px-panel">
+            <span class="status-tag wait"><i class="lamp amber"></i>Beta · unsigned</span>
+            <h3>Floating window / DMG</h3>
+            <p>Apple-silicon companion app for the local dashboard. Run <code>npx statusweave</code> first. If blocked, use System Settings → Privacy &amp; Security → Open Anyway.</p>
+            <a class="btn" href="https://github.com/IndexFziQ/statusweave/releases/latest/download/StatusWeave-macOS-arm64.dmg">↓ Download DMG</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PRIVACY ================= -->
+    <section>
+      <div class="wrap">
+        <span class="kicker">Shield stats · local-first</span>
+        <h2>Local by default. External access is explicit.</h2>
+        <div class="duo" style="margin-top:30px">
+          <article class="card px-panel">
+            <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="3" width="6" height="4" fill="none" stroke="#4be08c"/><rect x="2" y="1" width="4" height="2" fill="none" stroke="#4be08c"/><rect x="3" y="4" width="2" height="2" fill="#4be08c"/></svg></span>
+            <h3>Local by default</h3>
+            <p>The dashboard and REST API bind to localhost. Enabled AI integrations contact only their provider domains; StatusWeave has no telemetry and no hosted backend.</p>
+          </article>
+          <article class="card px-panel">
+            <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="0" y="0" width="3" height="3" fill="#3fd6e8"/><rect x="5" y="0" width="3" height="3" fill="#2a3347"/><rect x="0" y="5" width="3" height="3" fill="#2a3347"/><rect x="5" y="5" width="3" height="3" fill="#3fd6e8"/></svg></span>
+            <h3>External sources are opt-in</h3>
+            <p>Custom HTTP and command sources stay disabled until you explicitly enable and configure them yourself.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= QUICK START ================= -->
+    <section id="quick-start">
+      <div class="wrap split">
+        <div>
+          <span class="kicker">New game · quick start</span>
+          <h2>One command.</h2>
+          <p class="section-lede">No hosted account, no database, no clone. Requirements: macOS and Node.js 18+. The first launch opens the dashboard automatically. Provider login may still require your own action.</p>
+          <a class="btn" href="https://github.com/IndexFziQ/statusweave">Read the docs ↗</a>
+        </div>
+        <div class="terminal" aria-label="Installation commands">
+          <div class="terminal-head"><span class="dots"><i></i><i></i><i></i></span>terminal — zsh</div>
+          <pre><span class="p">$</span> npx statusweave
+
+<span class="c"># starts the local server and opens the dashboard</span>
+<span class="c"># at http://127.0.0.1:8787 — add --no-open to skip the browser</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= LICENSE ================= -->
+    <section>
+      <div class="wrap open-box px-panel">
+        <div>
+          <span class="kicker">Open source</span>
+          <h2>Free to play, free to build on.</h2>
+          <p>StatusWeave uses the permissive MIT License. Use it privately or commercially, modify it, distribute it, and build on it — while preserving the license notice.</p>
+        </div>
+        <span class="license-badge">MIT LICENSE</span>
+      </div>
+    </section>
+
+    <!-- ================= FINAL ================= -->
+    <section class="final wrap">
+      <span class="kicker" style="justify-content:center;display:inline-flex">Final stage</span>
+      <h2>Stop checking separate places for one answer.</h2>
+      <div class="actions">
+        <a class="btn primary" href="#quick-start">▶ Run StatusWeave</a>
+        <a class="btn" href="https://github.com/IndexFziQ/statusweave">☆ Star on GitHub</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <span>© 2026 StatusWeave contributors</span>
+    <span>Open source under the MIT License · Local-first · No telemetry</span>
+  </footer>
+
+  <script>
+    (function () {
+      var themeButton = document.getElementById('theme-toggle');
+      var themeMeta = document.querySelector('meta[name="theme-color"]');
+      var theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+      function applyTheme(next, persist) {
+        theme = next === 'light' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = theme;
+        themeButton.textContent = theme === 'light' ? '◑' : '◐';
+        themeButton.setAttribute('aria-pressed', String(theme === 'light'));
+        themeButton.setAttribute('aria-label', theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+        themeButton.title = themeButton.getAttribute('aria-label');
+        themeMeta.content = theme === 'light' ? '#e9edf2' : '#0a0d14';
+        if (persist) localStorage.setItem('sw-theme', theme);
+      }
+      themeButton.addEventListener('click', function () { applyTheme(theme === 'light' ? 'dark' : 'light', true); });
+      matchMedia('(prefers-color-scheme: light)').addEventListener('change', function (event) {
+        if (!localStorage.getItem('sw-theme')) applyTheme(event.matches ? 'light' : 'dark', false);
+      });
+      applyTheme(theme, false);
+
+      var btn = document.getElementById('copy-prompt');
+      var src = document.getElementById('agent-prompt');
+      btn.addEventListener('click', function () {
+        var done = function () {
+          btn.textContent = '[ COPIED ✓ ]';
+          btn.classList.add('done');
+          setTimeout(function () {
+            btn.textContent = '[ COPY PROMPT ]';
+            btn.classList.remove('done');
+          }, 1800);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(src.textContent).then(done, function () { fallback(); });
+        } else { fallback(); }
+        function fallback() {
+          var r = document.createRange();
+          r.selectNodeContents(src);
+          var s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(r);
+          try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = '[ SELECT + ⌘C ]'; }
+          s.removeAllRanges();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

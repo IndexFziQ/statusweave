@@ -1,0 +1,971 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StatusWeave · System Monitor</title>
+<meta name="theme-color" content="#0a0d14">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<script>
+  try {
+    const savedTheme = localStorage.getItem('sw-theme');
+    document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  } catch { document.documentElement.dataset.theme = 'dark'; }
+</script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0d14; --card: #10141f; --card-raised: #151a28; --card-inset: #0d1119;
+    --border: #3d4a63; --line: #2a3347; --text: #e8edf6; --text-secondary: #c3ccd9;
+    --muted: #aab4c6; --faint: #6b7690;
+    --green: #4be08c; --cyan: #3fd6e8; --yellow: #f0b83c; --red: #f0534f;
+    --violet: #9d8df1; --pink: #e879c5; --offline: #69758d; --shadow: #04060a;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --soft-shadow: 0 8px 26px rgba(4,6,10,.34);
+    --pixel-shadow: 3px 3px 0 var(--shadow);
+    --surface: rgba(16,20,31,.96); --surface-footer: rgba(16,20,31,.92);
+    --grid-color: rgba(63,214,232,.022); --glow-cyan: rgba(63,214,232,.08); --glow-violet: rgba(157,141,241,.07);
+    --chart-grid: rgba(255,255,255,.06); --row-line: rgba(42,51,71,.7);
+    --series-cpu: #3fd6e8; --series-mem: #9d8df1; --series-swap: #f0b83c; --series-load: #4be08c;
+    --series-pink: #e879c5; --series-blue: #6ea8fe; --series-orange: #fb923c; --series-purple: #c77dff; --series-teal: #2dd4bf;
+  }
+  html[data-theme="light"] {
+    color-scheme: light;
+    --bg: #e9edf2; --card: #f7f9fb; --card-raised: #ffffff; --card-inset: #e2e7ee;
+    --border: #8e9cb3; --line: #c6cfdc; --text: #17202e; --text-secondary: #2e3a4e;
+    --muted: #4d5a70; --faint: #64738a;
+    --green: #0d7a43; --cyan: #0871a0; --yellow: #8a5a00; --red: #c02824;
+    --violet: #6a4fd0; --pink: #a82f85; --offline: #64738a; --shadow: #17202e;
+    --soft-shadow: 0 6px 18px rgba(23,32,46,.10); --pixel-shadow: 3px 3px 0 rgba(23,32,46,.82);
+    --surface: rgba(247,249,251,.97); --surface-footer: rgba(247,249,251,.94);
+    --grid-color: rgba(23,32,46,.045); --glow-cyan: rgba(8,113,160,.045); --glow-violet: rgba(106,79,208,.04);
+    --chart-grid: rgba(23,32,46,.11); --row-line: rgba(142,156,179,.42);
+    --series-cpu: #0871a0; --series-mem: #6a4fd0; --series-swap: #8a5a00; --series-load: #0d7a43;
+    --series-pink: #a82f85; --series-blue: #2f5fb0; --series-orange: #a84b00; --series-purple: #7139a8; --series-teal: #0b746c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh; padding: 20px clamp(10px, 3vw, 36px) 36px;
+    color: var(--text); font: 14px/1.45 var(--mono); -webkit-font-smoothing: antialiased;
+    background-color: var(--bg);
+    background-image:
+      linear-gradient(var(--grid-color) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-color) 1px, transparent 1px),
+      radial-gradient(800px 380px at 8% -5%, var(--glow-cyan), transparent 72%),
+      radial-gradient(700px 360px at 96% 0, var(--glow-violet), transparent 70%);
+    background-size: 48px 48px, 48px 48px, auto, auto;
+  }
+  button, a { font: inherit; }
+  button:focus-visible, a:focus-visible, .legend span:focus-visible { outline: 2px dashed var(--cyan); outline-offset: 3px; }
+  #stage { max-width: 1280px; margin: 0 auto; }
+
+  header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 14px; margin-bottom: 16px; padding: 13px 14px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--soft-shadow); }
+  .brand h1 { padding: 4px 11px 4px 4px; display: inline-flex; align-items: center; gap: 3px;
+    color: var(--text); background: var(--card-raised); border: 2px solid var(--border);
+    box-shadow: var(--pixel-shadow); font-size: 17px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+  .brand h1::after { content: "LOCAL CONSOLE"; color: var(--cyan); font-size: 8px; letter-spacing: .14em; margin-left: 7px; }
+  .brand .host { margin-top: 8px; color: var(--faint); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .hdr-right, .status-group, .action-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .action-group { padding-left: 8px; border-left: 1px solid var(--line); }
+  .hp-badge { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 5px 10px;
+    background: var(--card-inset); border: 1px solid var(--line); border-radius: 6px; transition: border-color .2s ease-out; }
+  .hp-mark { color: var(--green); font-size: 9px; letter-spacing: .08em; }
+  .hp-badge.good .hp-mark { color: var(--cyan); } .hp-badge.warn .hp-mark { color: var(--yellow); }
+  .hp-badge.crit .hp-mark { color: var(--red); }
+  .hp-badge b { font-size: 16px; } .hp-badge .lvl { color: var(--muted); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+  .hp-badge.great { border-color: var(--green); } .hp-badge.good { border-color: var(--cyan); }
+  .hp-badge.warn { border-color: var(--yellow); } .hp-badge.crit { border-color: var(--red); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 2px rgba(240,83,79,.18); } }
+  .zoom-btn { min-width: 34px; min-height: 34px; padding: 5px 9px; cursor: pointer; white-space: nowrap;
+    color: var(--muted); background: var(--card-inset); border: 1px solid var(--line); border-radius: 6px; }
+  .zoom-btn:hover, .zoom-btn.on { color: var(--cyan); border-color: var(--cyan); }
+  .zoom-btn.spinning { color: var(--cyan); animation: spin 1s steps(8) infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .clock { min-height: 34px; display: flex; align-items: center; padding: 0 9px; color: var(--muted); background: var(--card-inset);
+    border: 1px solid var(--line); border-radius: 6px; font-size: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .status-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; background: var(--green); box-shadow: 0 0 6px rgba(75,224,140,.55); }
+  .status-dot.off { background: var(--red); box-shadow: 0 0 6px rgba(240,83,79,.55); }
+  .connection-banner { display: none; margin: -4px 0 16px; padding: 10px 12px; color: var(--text-secondary);
+    background: rgba(240,83,79,.08); border: 1px solid rgba(240,83,79,.5); border-left: 3px solid var(--red); border-radius: 6px; font-size: 11px; }
+  body.degraded .connection-banner { display: block; } body.degraded main { opacity: .58; }
+
+  main { display: flex; flex-direction: column; gap: 16px; }
+  html[data-theme="light"] .status-dot, html[data-theme="light"] .status-dot.off { box-shadow: none; }
+  .panel, .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--soft-shadow); }
+  .panel { min-width: 0; padding: 16px; }
+  .panel h3 { display: flex; align-items: center; justify-content: space-between; min-height: 35px; margin: -16px -16px 14px; padding: 8px 12px;
+    color: var(--muted); background: var(--card-raised); border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; font-size: 10px;
+    font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .panel h3::before { content: "▸ "; color: var(--green); }
+  .panel h3 > span:first-child { margin-right: auto; }
+  .panel-meta { color: var(--faint); font-size: 9px; font-weight: 500; letter-spacing: .03em; text-transform: none; }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .tile { min-width: 0; padding: 15px 16px; transition: border-color .15s ease-out, background .15s ease-out; }
+  .tile:hover { background: var(--card-raised); border-color: var(--border); }
+  .tile.unavailable { opacity: .65; }
+  .tile .t-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 9px; border-bottom: 1px solid var(--line); }
+  .tile .t-label { color: var(--cyan); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+  .tile .t-val { margin-top: 3px; color: var(--green); font-size: 28px; font-weight: 800; line-height: 1.25; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+  .tile .t-val small { color: var(--muted); font-size: 11px; font-weight: 400; }
+  .tile .t-sub { margin-top: 5px; overflow: hidden; color: var(--faint); font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
+  .t-val, .nums, .plan-row b, .donut-center b, td { font-variant-numeric: tabular-nums; }
+
+  .hpbar, .xpbar { position: relative; overflow: hidden; background: var(--card-inset); border: 1px solid var(--line); border-radius: 3px; }
+  .hpbar { height: 12px; margin-top: 9px; } .xpbar { height: 9px; margin-top: 6px; }
+  .hpbar > i, .xpbar > i { display: block; height: 100%; transition: width .35s ease-out, background .2s ease-out; }
+  .hpbar::after, .xpbar::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(90deg, transparent 0 calc(8.333% - 2px), var(--bg) calc(8.333% - 2px) 8.333%); }
+  .xp-label { display: flex; justify-content: space-between; margin-top: 8px; color: var(--muted); font-size: 10px; }
+  .core-strip { display: flex; align-items: flex-end; gap: 3px; height: 30px; margin-top: 8px; }
+  .core-strip i { min-height: 2px; flex: 1; border-radius: 1px 1px 0 0; transition: height .35s ease-out, background .2s ease-out; }
+
+  #chart { width: 100%; height: 158px; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; color: var(--muted); font-size: 10px; }
+  .legend span { cursor: pointer; user-select: none; } .legend span.off { opacity: .3; }
+  .legend i, .donut-legend .row i, .share-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; vertical-align: -1px; }
+  .lower-grid { display: grid; grid-template-columns: minmax(330px,.9fr) minmax(0,1.55fr); gap: 16px; align-items: stretch; }
+  .lower-grid .panel { height: 100%; }
+  .donut-row { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }
+  .donut-wrap { position: relative; width: 140px; height: 140px; flex-shrink: 0; margin: 0 auto; }
+  .donut { width: 140px; height: 140px; } .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .donut-center b { font-size: 15px; } .donut-center small { color: var(--muted); font-size: 9px; }
+  .donut-legend { min-width: 200px; max-height: 160px; flex: 1; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; }
+  .donut-legend .row { display: flex; align-items: center; gap: 4px; font-size: 10px; }
+  .donut-legend .row .name { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .donut-legend .row .val { color: var(--muted); }
+
+  .usage-cards { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+  .usage-card { min-width: 0; padding: 13px 14px; background: var(--card-raised); border: 1px solid var(--line); border-left: 2px solid var(--green); border-radius: 6px; }
+  .usage-card.setup { border-left-color: var(--yellow); } .usage-card.error { border-left-color: var(--red); }
+  .usage-card h4 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; color: var(--cyan); font-size: 12px; text-transform: uppercase; }
+  .usage-card .nums { color: var(--muted); font-size: 10px; line-height: 1.85; } .usage-card .nums b { color: var(--text); }
+  .badge { padding: 3px 7px; color: var(--green); background: rgba(75,224,140,.08); border: 1px solid currentColor; border-radius: 999px; font-size: 8px; letter-spacing: .08em; }
+  .badge.off { color: var(--yellow); background: rgba(240,184,60,.08); }
+  .command-copy { width: 100%; margin-top: 10px; padding: 8px 9px; color: var(--cyan); background: var(--card-inset); border: 1px solid var(--line); border-radius: 4px;
+    cursor: pointer; overflow: hidden; font-size: 10px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+  .command-copy:hover { border-color: var(--cyan); }
+  .plan-rows { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 10px; }
+  .plan-row { display: flex; align-items: center; gap: 8px; font-size: 10px; }
+  .plan-label { width: 88px; flex-shrink: 0; color: var(--muted); white-space: nowrap; }
+  .plan-bar { height: 10px; flex: 1; margin: 0; } .plan-row b { width: 36px; flex-shrink: 0; text-align: right; }
+  .plan-reset { min-width: 88px; flex-shrink: 0; color: var(--muted); font-size: 9px; text-align: right; }
+  .share-row { display: flex; align-items: center; gap: 16px; margin-top: 14px; padding: 12px 6px 0; border-top: 1px solid var(--line); }
+  .share-donut { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+  .share-donut svg { width: 88px; height: 88px; transform: rotate(-90deg); } .share-donut circle { fill: none; stroke-width: 13; }
+  .share-donut .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .share-donut .center b { font-size: 12px; } .share-donut .center small { color: var(--muted); font-size: 8px; }
+  .share-legend { flex: 1; display: flex; flex-wrap: wrap; gap: 5px 16px; font-size: 10px; }
+  .share-legend .it { display: flex; align-items: center; gap: 2px; } .share-legend .pct { color: var(--muted); }
+
+  #procWrap { overflow-x: auto; }
+  table { width: 100%; min-width: 610px; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
+  th { padding: 7px 8px; color: var(--faint); border-bottom: 1px solid var(--border); font-size: 9px; font-weight: 600; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--row-line); } tr:last-child td { border-bottom: 0; }
+  th:nth-child(1), td:nth-child(1) { width: 58px; } th:nth-child(2), td:nth-child(2) { width: auto; }
+  th:nth-child(3), td:nth-child(3), th:nth-child(5), td:nth-child(5) { width: 58px; }
+  th:nth-child(4), td:nth-child(4) { width: 98px; } th:nth-child(6), td:nth-child(6) { width: 78px; }
+  tbody tr:hover { background: var(--card-inset); }
+  td .xpbar { width: 80px; display: inline-block; margin: 0; vertical-align: middle; }
+  .empty { padding: 12px 4px; color: var(--faint); font-size: 11px; }
+  footer { max-width: 1280px; margin: 18px auto 0; padding: 11px 13px; color: var(--faint); background: var(--surface-footer); border: 1px solid var(--line); border-radius: 8px; font-size: 9px; line-height: 2.1; }
+  footer::before { content: "API / "; color: var(--green); } footer code { padding: 2px 5px; color: var(--cyan); background: var(--card-inset); border: 1px solid var(--line); border-radius: 3px; }
+
+  @media (max-width: 1020px) {
+    body:not(.zooming) .lower-grid { grid-template-columns: 1fr; }
+    body:not(.zooming) .usage-cards { grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); }
+  }
+  @media (max-width: 720px) {
+    body:not(.zooming) { padding: 10px 8px 20px; }
+    body:not(.zooming) header { align-items: stretch; padding: 10px; }
+    body:not(.zooming) .brand, body:not(.zooming) .hdr-right { width: 100%; }
+    body:not(.zooming) .hdr-right { justify-content: space-between; }
+    body:not(.zooming) .action-group { padding-left: 0; border-left: 0; }
+    body:not(.zooming) main { gap: 10px; }
+    body:not(.zooming) .panel { padding: 11px 12px; }
+    body:not(.zooming) .panel h3 { margin: -10px -11px 10px; }
+    body:not(.zooming) .brand h1 { font-size: 14px; }
+    body:not(.zooming) .brand h1::after { display: none; }
+    body:not(.zooming) .tiles { grid-template-columns: 1fr; gap: 8px; }
+    body:not(.zooming) .tile { display: grid; grid-template-columns: minmax(90px,.45fr) minmax(0,1fr); gap: 0 14px; padding: 10px 12px; }
+    body:not(.zooming) .tile .t-head { grid-row: 1 / span 2; display: block; border: 0; padding: 0; }
+    body:not(.zooming) .tile .t-val { margin-top: 2px; font-size: 24px; }
+    body:not(.zooming) .tile .hpbar { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
+    body:not(.zooming) .tile .core-strip, body:not(.zooming) .tile > .t-sub { grid-column: 2; }
+    body:not(.zooming) #chart { height: 118px; }
+    body:not(.zooming) .donut-wrap, body:not(.zooming) .donut { width: 100px; height: 100px; }
+    body:not(.zooming) .usage-cards { grid-template-columns: 1fr; gap: 8px; }
+    body:not(.zooming) td .xpbar { width: 48px; }
+    body:not(.zooming) .share-row { align-items: flex-start; }
+    body:not(.zooming) footer { overflow-x: auto; white-space: nowrap; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div id="stage">
+<header>
+  <div class="brand">
+    <h1><img src="/favicon.svg" alt="" style="width:22px;height:22px;vertical-align:-4px;margin-right:6px">StatusWeave</h1>
+    <div class="host" id="hostInfo" data-i18n="loading">加载中…</div>
+  </div>
+  <div class="hdr-right">
+    <div class="status-group">
+      <div class="hp-badge" id="hpBadge" title="系统健康值:综合 CPU/内存/Swap/负载">
+        <span class="hp-mark">HP</span><b id="hpScore">–</b><span class="lvl" id="hpLevel"></span>
+      </div>
+      <div class="clock"><span class="status-dot" id="dot"></span><span id="clock">--:--:--</span></div>
+    </div>
+    <div class="action-group">
+      <a class="zoom-btn" id="ghLink" href="https://github.com/IndexFziQ/statusweave" target="_blank" rel="noopener" title="GitHub — IndexFziQ/statusweave" style="display:inline-flex;align-items:center;text-decoration:none">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      </a>
+      <button class="zoom-btn" id="refreshBtn" aria-label="Refresh">⟳</button>
+      <button class="zoom-btn" id="themeBtn" aria-label="Toggle color theme" aria-pressed="false">◐</button>
+      <button class="zoom-btn" id="langBtn"></button>
+      <button class="zoom-btn" id="zoomBtn" title="等比例缩放:整个面板随窗口大小缩放" data-i18n="zoomBtn">⌕ 等比</button>
+    </div>
+  </div>
+</header>
+<div class="connection-banner" id="connectionBanner" data-i18n="connectionLost">本地服务连接中断，正在重试；当前显示上次成功采集的数据。</div>
+
+<main>
+  <!-- KPI 瓷砖 -->
+  <section class="tiles">
+    <div class="tile">
+      <div class="t-head"><span class="t-label">CPU</span><span class="t-sub" id="cpuCores"></span></div>
+      <div class="t-val" id="cpuPct">–<small>%</small></div>
+      <div class="hpbar"><i id="cpuBar"></i></div>
+      <div class="core-strip" id="coreStrip"></div>
+      <div class="t-sub" id="cpuModel"></div>
+    </div>
+    <div class="tile">
+      <div class="t-head"><span class="t-label" data-i18n="memory">内存</span><span class="t-sub" id="memTotal"></span></div>
+      <div class="t-val" id="memPct">–<small>%</small></div>
+      <div class="hpbar"><i id="memBar"></i></div>
+      <div class="t-sub" id="memSub"></div>
+    </div>
+    <div class="tile unavailable" id="gpuTile">
+      <div class="t-head"><span class="t-label">GPU</span><span class="t-sub" id="gpuMem"></span></div>
+      <div class="t-val" id="gpuPct">–<small>%</small></div>
+      <div class="hpbar"><i id="gpuBar"></i></div>
+      <div class="t-sub" id="gpuSub">当前机器未提供 GPU 指标</div>
+    </div>
+  </section>
+
+  <!-- 历史趋势 -->
+  <section class="panel" id="chartPanel">
+    <h3 data-i18n="history">历史趋势</h3>
+    <canvas id="chart"></canvas>
+    <div class="legend" id="chartLegend"></div>
+  </section>
+
+  <!-- AI 用量 -->
+  <section class="panel" id="usagePanel" style="display:none">
+    <h3><span data-i18n="aiUsage">AI 会员用量</span><span class="panel-meta" id="usageUpdated" data-i18n="refreshNote">每 10 分钟自动更新</span></h3>
+    <div class="usage-cards" id="usageCards"></div>
+    <div class="share-row" id="shareRow" style="display:none"></div>
+  </section>
+
+  <div class="lower-grid">
+    <!-- 应用内存分布 -->
+    <section class="panel" id="donutPanel">
+      <h3 data-i18n="appMem">应用内存分布 (RSS)</h3>
+      <div class="donut-row">
+        <div class="donut-wrap">
+          <svg class="donut" id="donutSvg" viewBox="0 0 140 140"></svg>
+          <div class="donut-center"><b id="donutTotal">–</b><small data-i18n="totalRss">总 RSS</small></div>
+        </div>
+        <div class="donut-legend" id="donutLegend"></div>
+      </div>
+    </section>
+
+    <!-- 进程 -->
+    <section class="panel" id="procPanel">
+      <h3 data-i18n="topProc">Top 进程 (按 CPU)</h3>
+      <div id="procWrap">
+        <table>
+          <thead><tr><th>PID</th><th data-i18n="process">进程</th><th>CPU %</th><th></th><th>MEM %</th><th data-i18n="memory">内存</th></tr></thead>
+          <tbody id="procBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <span data-i18n="footerApi">API(可供其他 APP / coding agent 调用):</span>
+  <code>GET /api/stats</code> <code>GET /api/cpu</code> <code>GET /api/memory</code> <code>GET /api/processes</code> <code>GET /api/apps</code> <code>GET /api/usage</code><br>
+  <span data-i18n="footerExample">示例:</span> <code>curl -s http://localhost:8787/api/stats | jq .cpu.overall</code>
+</footer>
+</div>
+
+<script>
+const TOKEN_VARS = {
+  background: '--bg', panel: '--card', panelRaised: '--card-raised', panelInset: '--card-inset', ink: '--text',
+  inkSecondary: '--text-secondary', muted: '--muted', faint: '--faint', line: '--line', lineHard: '--border',
+  healthy: '--green', active: '--cyan', warning: '--yellow', critical: '--red', offline: '--offline',
+  unknown: '--violet', pink: '--pink', shadow: '--shadow',
+};
+let sharedTokens = null;
+function applySharedTokens() {
+  const activeTheme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  const palette = (sharedTokens && sharedTokens.themes && sharedTokens.themes[activeTheme]) || {};
+  for (const cssVar of Object.values(TOKEN_VARS)) {
+    document.documentElement.style.removeProperty(cssVar);
+  }
+  for (const [name, value] of Object.entries(palette)) {
+    if (TOKEN_VARS[name]) document.documentElement.style.setProperty(TOKEN_VARS[name], value);
+  }
+}
+fetch('/statusweave.tokens.json')
+  .then((r) => r.ok ? r.json() : Promise.reject(new Error('tokens unavailable')))
+  .then((tokens) => {
+    sharedTokens = tokens;
+    applySharedTokens();
+  })
+  .catch(() => {}); // CSS fallbacks keep the local console usable offline.
+
+const I18N = {
+  en: {
+    loading: 'Loading…',
+    healthTitle: 'System health: CPU/Memory/Swap/Load combined',
+    zoomBtn: '⌕ Zoom',
+    refreshTitle: 'Refresh now: re-fetch system stats & AI plan usage',
+    zoomTitle: 'Proportional zoom: the whole panel scales with the window',
+    memory: 'Memory',
+    memShort: 'Mem',
+    history: 'History',
+    appMem: 'App Memory (RSS)',
+    totalRss: 'Total RSS',
+    aiUsage: 'AI Plan Usage',
+    refreshNote: 'Auto refresh every 10 min',
+    updated: 'Updated {time} · auto 10 min',
+    connectionLost: 'Local service connection lost. Retrying; showing the last successful sample.',
+    gpuUnavailable: 'GPU metrics are unavailable on this machine',
+    topProc: 'Top Processes (by CPU)',
+    process: 'Process',
+    footerApi: 'API (for other apps / coding agents):',
+    footerExample: 'Example:',
+    seriesCpu: 'CPU %',
+    seriesMem: 'Memory %',
+    seriesSwap: 'Swap %',
+    seriesLoad: 'Load %',
+    dayUnit: 'd ',
+    hourUnit: 'h ',
+    minUnit: 'm',
+    uptime: 'uptime',
+    cores: 'cores',
+    used: 'used',
+    available: 'available',
+    hpGreat: 'Smooth',
+    hpGood: 'Good',
+    hpWarn: 'Tight',
+    hpCrit: 'Critical',
+    donutNeedPs: 'Requires ps permission: run <code>node server.js</code> in a terminal to see app stats',
+    procNeedPs: 'Process list unavailable (requires ps permission). Run <code>node server.js</code> in a terminal to enable it.',
+    notConfigured: 'Not configured',
+    disabled: 'Disabled',
+    connected: 'Connected',
+    today: 'Today',
+    output: 'output',
+    last5h: 'Last 5h',
+    month: 'This month',
+    sessions: 'sessions',
+    planPending: 'Plan limit data not available yet',
+    setupRequired: 'SETUP REQUIRED',
+    authRequired: 'CLI LOGIN REQUIRED',
+    authorizeHint: 'Run statusweave authorize {provider} in Terminal. Existing CLI logins are reused; sign in only if the official CLI asks.',
+    loginHint: 'Run statusweave authorize {provider}. The official CLI login flow opens only if its saved session is missing or expired.',
+    limitUnavailable: 'LIMIT UNAVAILABLE — usage totals are still available',
+    planStale: 'LIVE REFRESH FAILED — showing limits captured at {time}',
+    cliMissing: 'CLI MISSING',
+    copyCommand: 'Click to copy: {command}',
+    copied: 'Copied ✓',
+    shareUnit: 'this month',
+    themeToLight: 'Switch to light theme',
+    themeToDark: 'Switch to dark theme',
+  },
+  zh: {
+    loading: '加载中…',
+    healthTitle: '系统健康值:综合 CPU/内存/Swap/负载',
+    zoomBtn: '⌕ 等比',
+    refreshTitle: '立即刷新:重抓系统状态与 AI 用量(限额约 20 秒后更新)',
+    zoomTitle: '等比例缩放:整个面板随窗口大小缩放',
+    memory: '内存',
+    memShort: '内存',
+    history: '历史趋势',
+    appMem: '应用内存分布 (RSS)',
+    totalRss: '总 RSS',
+    aiUsage: 'AI 会员用量',
+    refreshNote: '每 10 分钟自动更新',
+    updated: '{time} 更新 · 每 10 分钟自动采集',
+    connectionLost: '本地服务连接中断，正在重试；当前显示上次成功采集的数据。',
+    gpuUnavailable: '当前机器未提供 GPU 指标',
+    topProc: 'Top 进程 (按 CPU)',
+    process: '进程',
+    footerApi: 'API(可供其他 APP / coding agent 调用):',
+    footerExample: '示例:',
+    seriesCpu: 'CPU %',
+    seriesMem: '内存 %',
+    seriesSwap: 'Swap %',
+    seriesLoad: '负载 %',
+    dayUnit: '天',
+    hourUnit: '时',
+    minUnit: '分',
+    uptime: '运行',
+    cores: '核',
+    used: '已用',
+    available: '可用',
+    hpGreat: '流畅',
+    hpGood: '良好',
+    hpWarn: '吃紧',
+    hpCrit: '爆表',
+    donutNeedPs: '需要 ps 权限:在终端手动运行 <code>node server.js</code> 后可见',
+    procNeedPs: '进程列表不可用(需要 ps 权限)。在终端手动运行 <code>node server.js</code> 即可启用。',
+    notConfigured: '未配置',
+    disabled: '未启用',
+    connected: '已连接',
+    today: '今日',
+    output: '输出',
+    last5h: '近 5 小时',
+    month: '本月',
+    sessions: '会话',
+    planPending: '套餐限额数据暂未获取',
+    setupRequired: '待设置',
+    authRequired: 'CLI 登录已失效',
+    authorizeHint: '请在终端运行 statusweave authorize {provider}。已登录的 CLI 会直接复用，只有官方 CLI 提示时才需要重新登录。',
+    loginHint: '请运行 statusweave authorize {provider}；仅当 CLI 会话缺失或过期时，才会打开官方登录流程。',
+    limitUnavailable: '套餐限额暂不可用，但本地用量统计仍可查看',
+    planStale: '实时刷新失败 · 当前显示 {time} 最近成功获取的限额',
+    cliMissing: 'CLI 未安装',
+    copyCommand: '点击复制：{command}',
+    copied: '已复制 ✓',
+    shareUnit: '本月 token',
+    themeToLight: '切换到浅色主题',
+    themeToDark: '切换到深色主题',
+  },
+};
+const urlLang = new URLSearchParams(location.search).get('lang');
+let lang = (urlLang === 'zh' || urlLang === 'en' ? urlLang : null) || localStorage.getItem('lang') || ((navigator.language || 'en').startsWith('zh') ? 'zh' : 'en');
+const t = (k) => (I18N[lang] && I18N[lang][k]) || I18N.en[k] || k;
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  $('hpBadge').title = t('healthTitle');
+  $('zoomBtn').title = t('zoomTitle');
+  $('refreshBtn').title = t('refreshTitle');
+  $('langBtn').textContent = lang === 'zh' ? 'EN' : '中';
+  $('themeBtn').title = theme === 'dark' ? t('themeToLight') : t('themeToDark');
+  $('themeBtn').setAttribute('aria-label', $('themeBtn').title);
+}
+
+const MAX_HIST = 90;
+const hist = { cpu: [], mem: [], swap: [], load: [] };
+// 趋势图序列:可点击图例开关显示
+const SERIES = [
+  { key: 'cpu', labelKey: 'seriesCpu', colorVar: '--series-cpu' },
+  { key: 'mem', labelKey: 'seriesMem', colorVar: '--series-mem' },
+  { key: 'swap', labelKey: 'seriesSwap', colorVar: '--series-swap' },
+  { key: 'load', labelKey: 'seriesLoad', colorVar: '--series-load' },
+];
+const seriesVisible = { cpu: true, mem: true, swap: false, load: false };
+let timer = null;
+
+const $ = (id) => document.getElementById(id);
+let theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+function rgba(color, alpha) {
+  const hex = color.replace('#', '');
+  if (/^[0-9a-f]{6}$/i.test(hex)) {
+    return `rgba(${parseInt(hex.slice(0, 2), 16)},${parseInt(hex.slice(2, 4), 16)},${parseInt(hex.slice(4, 6), 16)},${alpha})`;
+  }
+  return color;
+}
+function applyTheme(next, persist = false) {
+  theme = next === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = theme;
+  applySharedTokens();
+  document.querySelector('meta[name="theme-color"]').content = theme === 'light' ? '#e9edf2' : '#0a0d14';
+  $('themeBtn').setAttribute('aria-pressed', String(theme === 'light'));
+  $('themeBtn').textContent = theme === 'light' ? '◑' : '◐';
+  if (persist) localStorage.setItem('sw-theme', theme);
+  applyI18n();
+  buildLegend();
+  drawChart();
+}
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[ch]);
+
+/* ---------- 像素级文本截断(借鉴 chenglou/pretext:canvas 测量 + 纯算术,零 DOM reflow) ---------- */
+const measureCtx = document.createElement('canvas').getContext('2d');
+function textWidth(text, font) {
+  measureCtx.font = font;
+  return measureCtx.measureText(text).width;
+}
+/** Truncate text with … so it fits maxWidth exactly (binary search, no DOM reads). */
+function fitText(text, maxWidth, font) {
+  if (textWidth(text, font) <= maxWidth) return text;
+  let lo = 0, hi = text.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (textWidth(text.slice(0, mid) + '…', font) <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  return text.slice(0, lo) + '…';
+}
+
+function fmtBytes(b) {
+  if (b == null) return '—';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(b >= 100 ? 0 : 1) + ' ' + u[i];
+}
+function fmtTok(n) {
+  if (n == null) return '—';
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  if (d) return `${d}${t('dayUnit')}${h}${t('hourUnit')}`.trimEnd();
+  if (h) return `${h}${t('hourUnit')}${m}${t('minUnit')}`;
+  return `${m}${t('minUnit')}`;
+}
+function colorFor(p) {
+  return p < 50 ? 'var(--green)' : p < 80 ? 'var(--yellow)' : 'var(--red)';
+}
+function cssColor(p) {
+  return p < 50 ? 'var(--green)' : p < 80 ? 'var(--yellow)' : 'var(--red)';
+}
+
+/* ---------- 系统健康值 ---------- */
+function updateHealth(s) {
+  const cpu = s.cpu?.overall ?? 0;
+  const mem = s.memory?.usedPercent ?? 0;
+  const swap = s.swap?.usedPercent ?? 0;
+  const loadPct = Math.min(100, (s.load[0] / (s.cpu?.cores || 10)) * 100);
+  const score = Math.max(0, Math.round(100 - (cpu * 0.3 + mem * 0.3 + swap * 0.2 + loadPct * 0.2)));
+  const [level, cls] =
+    score >= 85 ? [t('hpGreat'), 'great'] :
+    score >= 70 ? [t('hpGood'), 'good'] :
+    score >= 50 ? [t('hpWarn'), 'warn'] : [t('hpCrit'), 'crit'];
+  $('hpScore').textContent = score;
+  $('hpScore').style.color = score >= 85 ? 'var(--green)' : score >= 70 ? 'var(--cyan)' : score >= 50 ? 'var(--yellow)' : 'var(--red)';
+  $('hpLevel').textContent = level;
+  $('hpBadge').className = 'hp-badge ' + cls;
+}
+
+/* ---------- 应用分布环形 ---------- */
+const PALETTE = ['var(--series-cpu)', 'var(--series-mem)', 'var(--series-pink)', 'var(--series-load)', 'var(--series-swap)', 'var(--series-blue)',
+  'var(--series-orange)', 'var(--series-purple)', 'var(--series-teal)', 'var(--red)', 'var(--offline)'];
+
+function renderDonut(apps) {
+  const svg = $('donutSvg'), legend = $('donutLegend');
+  if (!apps || !apps.length) {
+    svg.innerHTML = '';
+    $('donutTotal').textContent = '—';
+    legend.innerHTML = `<div class="empty">${t('donutNeedPs')}</div>`;
+    return;
+  }
+  const total = apps.reduce((a, b) => a + b.rss, 0) || 1;
+  const Cd = 2 * Math.PI * 45;
+  let offset = 0;
+  const segs = apps.map((a, i) => {
+    const frac = a.rss / total;
+    const dash = `${(frac * Cd).toFixed(2)} ${Math.max(Cd - frac * Cd, 0.01).toFixed(2)}`;
+    const el = `<circle cx="70" cy="70" r="45" fill="none" stroke="${PALETTE[i % PALETTE.length]}" stroke-width="20" stroke-dasharray="${dash}" stroke-dashoffset="${(-offset * Cd).toFixed(2)}"><title>${esc(a.name)}</title></circle>`;
+    offset += frac;
+    return el;
+  }).join('');
+  svg.innerHTML = `<g transform="rotate(-90 70 70)">${segs}</g>`;
+  $('donutTotal').textContent = fmtBytes(total);
+  // Pixel-perfect name truncation (canvas-measured, accounts for CJK/emoji widths)
+  const legendW = legend.clientWidth || 320;
+  const nameFont = '11px -apple-system, "Helvetica Neue", sans-serif';
+  const nameMax = Math.max(80, legendW - 150); // dot + gaps + value column
+  legend.innerHTML = apps.map((a, i) => `
+    <div class="row">
+      <i style="background:${PALETTE[i % PALETTE.length]}"></i>
+      <span class="name">${esc(fitText(`${a.name}${a.processes > 1 ? ` ×${a.processes}` : ''}`, nameMax, nameFont))}</span>
+      <span class="val">${fmtBytes(a.rss)} · ${((a.rss / total) * 100).toFixed(1)}%</span>
+    </div>`).join('');
+}
+
+/* ---------- AI 用量 ---------- */
+function fmtReset(w) {
+  if (w.resetAfterSeconds != null) {
+    const s = w.resetAfterSeconds;
+    if (s >= 86400) {
+      const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600);
+      return lang === 'zh' ? `${d}天${h}时后重置` : `resets in ${d}d ${h}h`;
+    }
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return lang === 'zh' ? `${h}时${m}分后重置` : `resets in ${h}h ${m}m`;
+  }
+  if (w.resetsAt) {
+    const d = new Date(w.resetsAt);
+    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    if (lang === 'zh') return `${d.getMonth() + 1}-${d.getDate()} ${hm} 重置`;
+    return `resets ${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${hm}`;
+  }
+  return '';
+}
+
+const PLAN_LABELS = { weekly: { zh: '本周限额', en: 'Weekly limit' }, '5h': { zh: '5 小时限额', en: '5h limit' } };
+
+function planRows(p) {
+  const pl = p.plan;
+  if (!pl) return '';
+  if (!pl.windows || !pl.windows.length) {
+    return `<div class="plan-rows"><div class="empty" style="padding:2px 0">${t('limitUnavailable')}</div></div>`;
+  }
+  const staleNotice = p.planStale
+    ? `<div class="empty" style="padding:0;color:var(--yellow)">${t('planStale').replace('{time}', new Date(p.planCachedAt).toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' }))}</div>`
+    : '';
+  return `<div class="plan-rows">${staleNotice}` + pl.windows.map((w) => {
+    const pct = Math.max(0, Math.min(100, Number(w.pct) || 0));
+    return `
+    <div class="plan-row">
+      <span class="plan-label">${esc((PLAN_LABELS[w.key] && PLAN_LABELS[w.key][lang]) || w.label)}</span>
+      <div class="xpbar plan-bar"><i style="width:${pct}%;background:${colorFor(pct)}"></i></div>
+      <b style="color:${cssColor(pct)}">${pct}%</b>
+      <span class="plan-reset">${esc(fmtReset(w))}</span>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+/* ---------- 订阅 token 占比 ---------- */
+function renderShare(providers) {
+  const row = $('shareRow');
+  const items = providers
+    .map((p) => ({ name: p.provider, total: (p.month && p.month.total) || 0 }))
+    .filter((x) => x.total > 0);
+  if (items.length < 2) { row.style.display = 'none'; return; }
+  const total = items.reduce((a, b) => a + b.total, 0);
+  const C = 2 * Math.PI * 37;
+  let off = 0;
+  const segs = items.map((it, i) => {
+    const frac = it.total / total;
+    const dash = `${(frac * C).toFixed(2)} ${Math.max(C - frac * C, 0.01).toFixed(2)}`;
+    const el = `<circle cx="44" cy="44" r="37" stroke="${PALETTE[i % PALETTE.length]}" stroke-dasharray="${dash}" stroke-dashoffset="${(-off * C).toFixed(2)}"/>`;
+    off += frac;
+    return el;
+  }).join('');
+  row.style.display = '';
+  row.innerHTML = `
+    <div class="share-donut">
+      <svg viewBox="0 0 88 88">${segs}</svg>
+      <div class="center"><b>${fmtTok(total)}</b><small>${t('shareUnit')}</small></div>
+    </div>
+    <div class="share-legend">
+      ${items.map((it, i) => `<span class="it"><i style="background:${PALETTE[i % PALETTE.length]}"></i>${esc(it.name)} <b>${fmtTok(it.total)}</b> <span class="pct">${((it.total / total) * 100).toFixed(1)}%</span></span>`).join('')}
+    </div>`;
+}
+
+function renderUsage(usage) {
+  const panel = $('usagePanel');
+  if (!usage || !usage.providers || !usage.providers.length) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  if (usage.timestamp) {
+    const time = new Date(usage.timestamp).toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+    $('usageUpdated').textContent = t('updated').replace('{time}', time);
+  }
+  renderShare(usage.providers);
+  $('usageCards').innerHTML = usage.providers.map((p) => {
+    if (!p.detected) {
+      const provider = String(p.provider).toLowerCase();
+      const needsSetup = ['NOT_CONFIGURED', 'CONSENT_REVOKED', 'INTERACTION_REQUIRED'].includes(p.authorizationState);
+      const needsLogin = p.authorizationState === 'AUTH_REQUIRED';
+      const hint = needsLogin
+        ? t('loginHint').replace('{provider}', provider)
+        : needsSetup ? t('authorizeHint').replace('{provider}', provider)
+        : p.hint || '';
+      const badgeLabel = p.authorizationState === 'CLI_MISSING'
+        ? t('cliMissing')
+        : needsLogin ? t('authRequired')
+        : needsSetup ? t('setupRequired') : (p.enabled === false ? t('disabled') : t('notConfigured'));
+      const command = `statusweave authorize ${provider}`;
+      const cardClass = needsLogin ? 'error' : 'setup';
+      return `<div class="usage-card ${cardClass}">
+        <h4>${esc(p.provider)}<span class="badge off">${badgeLabel}</span></h4>
+        <div class="nums">${esc(hint)}</div>
+        <button class="command-copy" data-command="${esc(command)}" title="${esc(t('copyCommand').replace('{command}', command))}">$ ${esc(command)}</button></div>`;
+    }
+    const td = p.today || {}, mo = p.month || {};
+    let rows = '';
+    if (td.total != null) {
+      rows = `${t('today')} <b>${fmtTok(td.total)}</b> token(${t('output')} ${fmtTok(td.output)})<br>`;
+      if (p.last5h) rows += `${t('last5h')} <b>${fmtTok(p.last5h.total)}</b><br>`;
+      rows += `${t('month')} <b>${fmtTok(mo.total)}</b> token`;
+      if (p.sessions != null) rows += ` · ${p.sessions} ${t('sessions')}`;
+    }
+    if (Array.isArray(p.rows) && p.rows.length) {
+      if (rows) rows += '<br>';
+      for (const r of p.rows) rows += `${esc(r.label)} <b>${esc(r.value)}</b><br>`;
+      rows = rows.replace(/<br>$/, '');
+    }
+    if (!rows && p.hint) rows = esc(p.hint);
+    const tier = p.plan && p.plan.tier ? ` · ${esc(p.plan.tier)}` : '';
+    const limitNotice = !p.plan && p.authorizationState === 'LIMIT_UNAVAILABLE'
+      ? `<div class="plan-rows"><div class="empty" style="padding:2px 0">${t('limitUnavailable')}</div></div>`
+      : '';
+    return `<div class="usage-card">
+      <h4>${esc(p.provider)}<span class="badge">${t('connected')}${tier}</span></h4>
+      ${planRows(p)}
+      ${limitNotice}
+      ${rows ? `<div class="nums">${rows}</div>` : ''}</div>`;
+  }).join('');
+}
+
+$('usageCards').addEventListener('click', async (event) => {
+  const button = event.target.closest('.command-copy');
+  if (!button) return;
+  const command = button.dataset.command;
+  try {
+    await navigator.clipboard.writeText(command);
+  } catch {
+    const area = document.createElement('textarea');
+    area.value = command;
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+  }
+  const original = button.textContent;
+  button.textContent = t('copied');
+  setTimeout(() => { if (button.isConnected) button.textContent = original; }, 1500);
+});
+
+/* ---------- 主更新 ---------- */
+function update(s) {
+  $('dot').className = 'status-dot';
+  $('hostInfo').textContent = `${s.host.hostname} · ${s.host.platform} ${s.host.arch} · ${t('uptime')} ${fmtUptime(s.host.uptime)}`;
+  updateHealth(s);
+
+  // CPU
+  const cpu = s.cpu || { overall: 0, perCore: [], cores: 0, model: '' };
+  $('cpuPct').innerHTML = `${cpu.overall.toFixed(1)}<small>%</small>`;
+  $('cpuPct').style.color = cssColor(cpu.overall);
+  $('cpuBar').style.width = cpu.overall + '%';
+  $('cpuBar').style.background = colorFor(cpu.overall);
+  $('cpuCores').textContent = `${cpu.cores} ${t('cores')}`;
+  $('cpuModel').textContent = cpu.model;
+  // 核心条带
+  const strip = $('coreStrip');
+  if (strip.children.length !== cpu.perCore.length) {
+    strip.innerHTML = cpu.perCore.map(() => '<i></i>').join('');
+  }
+  cpu.perCore.forEach((v, i) => {
+    const bar = strip.children[i];
+    if (bar) { bar.style.height = Math.max(v, 3) + '%'; bar.style.background = colorFor(v); }
+  });
+
+  // 内存
+  const mem = s.memory || {};
+  $('memPct').innerHTML = `${(mem.usedPercent ?? 0).toFixed(1)}<small>%</small>`;
+  $('memPct').style.color = cssColor(mem.usedPercent ?? 0);
+  $('memBar').style.width = (mem.usedPercent ?? 0) + '%';
+  $('memBar').style.background = colorFor(mem.usedPercent ?? 0);
+  $('memTotal').textContent = fmtBytes(mem.total);
+  $('memSub').textContent = `${fmtBytes(mem.used)} ${t('used')} · ${fmtBytes(mem.available)} ${t('available')}`;
+
+  // GPU(Apple Silicon,IORegistry)
+  const gpu = s.gpu;
+  if (gpu && gpu.utilization != null) {
+    $('gpuTile').classList.remove('unavailable');
+    $('gpuPct').innerHTML = `${gpu.utilization.toFixed(1)}<small>%</small>`;
+    $('gpuPct').style.color = cssColor(gpu.utilization);
+    $('gpuBar').style.width = gpu.utilization + '%';
+    $('gpuBar').style.background = colorFor(gpu.utilization);
+    $('gpuMem').textContent = gpu.memAlloc ? fmtBytes(gpu.memAlloc) + ' alloc' : '';
+    $('gpuSub').textContent = gpu.memUsed != null ? fmtBytes(gpu.memUsed) + ' in use' : '';
+  } else {
+    $('gpuTile').classList.add('unavailable');
+    $('gpuPct').innerHTML = `–<small>%</small>`;
+    $('gpuBar').style.width = '0%';
+    $('gpuMem').textContent = '';
+    $('gpuSub').textContent = t('gpuUnavailable');
+  }
+
+  // 负载%(归一化到核心数,供健康值与趋势图)
+  const loadPct = Math.min(100, (s.load[0] / (cpu.cores || 10)) * 100);
+
+  renderDonut(s.apps);
+  renderUsage(s.usage);
+
+  // 进程
+  if (s.processes && s.processes.length) {
+    const cmdMax = Math.max(120, ($('procBody').clientWidth || 640) - 340);
+    const cmdFont = '12px ui-monospace, "SF Mono", Menlo, monospace';
+    $('procBody').innerHTML = s.processes.map((p) => `
+      <tr>
+        <td>${p.pid}</td>
+        <td title="${esc(p.command)}">${esc(fitText(p.command, cmdMax, cmdFont))}</td>
+        <td style="color:${cssColor(p.cpu)}">${p.cpu.toFixed(1)}</td>
+        <td><span class="xpbar"><i style="width:${Math.min(p.cpu, 100)}%;background:${colorFor(p.cpu)}"></i></span></td>
+        <td>${p.mem.toFixed(1)}</td>
+        <td>${fmtBytes(p.rss)}</td>
+      </tr>`).join('');
+  } else {
+    $('procWrap').innerHTML = `<div class="empty">${t('procNeedPs')}</div>`;
+  }
+
+  // 历史
+  hist.cpu.push(cpu.overall);
+  hist.mem.push(mem.usedPercent ?? 0);
+  hist.swap.push(s.swap ? s.swap.usedPercent : 0);
+  hist.load.push(loadPct);
+  if (hist.cpu.length > MAX_HIST) for (const k in hist) hist[k].shift();
+  drawChart();
+
+  document.title = `CPU ${cpu.overall.toFixed(0)}% · ${t('memShort')} ${(mem.usedPercent ?? 0).toFixed(0)}%`;
+}
+
+/* ---------- 趋势图 ---------- */
+function buildLegend() {
+  $('chartLegend').innerHTML = SERIES.map(
+    (s) => `<span data-k="${s.key}" role="button" tabindex="0" class="${seriesVisible[s.key] ? '' : 'off'}"><i style="background:var(${s.colorVar})"></i>${t(s.labelKey)}</span>`
+  ).join('');
+  $('chartLegend').querySelectorAll('span').forEach((el) => {
+    const toggle = () => {
+      const k = el.dataset.k;
+      seriesVisible[k] = !seriesVisible[k];
+      el.classList.toggle('off', !seriesVisible[k]);
+      el.setAttribute('aria-pressed', String(seriesVisible[k]));
+      drawChart();
+    };
+    el.setAttribute('aria-pressed', String(seriesVisible[el.dataset.k]));
+    el.addEventListener('click', toggle);
+    el.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); }
+    });
+  });
+}
+
+function drawChart() {
+  const cv = $('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return;
+  if (cv.width !== Math.round(w * dpr)) { cv.width = w * dpr; cv.height = h * dpr; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = cssVar('--chart-grid');
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = (h * i) / 4 + 0.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+  const line = (data, color) => {
+    if (data.length < 2) return;
+    const step = w / (MAX_HIST - 1);
+    const x0 = w - (data.length - 1) * step;
+    ctx.beginPath();
+    data.forEach((v, i) => {
+      const x = x0 + i * step, y = h - (v / 100) * h;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.lineTo(x0 + (data.length - 1) * step, h); ctx.lineTo(x0, h); ctx.closePath();
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, rgba(color, 0.18));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fill();
+  };
+  for (const s of SERIES) {
+    if (seriesVisible[s.key]) line(hist[s.key], cssVar(s.colorVar));
+  }
+}
+
+/* ---------- 等比缩放模式 ---------- */
+let zoomOn = localStorage.getItem('zoom') === '1';
+function applyZoom() {
+  const st = $('stage');
+  if (zoomOn) {
+    const k = Math.min(1.2, Math.max(0.3, window.innerWidth / 1280));
+    st.style.width = '1280px';
+    st.style.zoom = k;
+    document.body.classList.add('zooming');
+  } else {
+    st.style.width = '';
+    st.style.zoom = '';
+    document.body.classList.remove('zooming');
+  }
+  $('zoomBtn').classList.toggle('on', zoomOn);
+  drawChart();
+}
+$('zoomBtn').addEventListener('click', () => {
+  zoomOn = !zoomOn;
+  localStorage.setItem('zoom', zoomOn ? '1' : '0');
+  applyZoom();
+});
+
+/* ---------- 手动刷新 ---------- */
+// 系统指标:立即重取;AI 用量:通知服务端强制重抓(Kimi 伪 TTY 慢,约 20s 后随轮询自动更新)
+let refreshing = false;
+$('refreshBtn').addEventListener('click', async () => {
+  if (refreshing) return;
+  refreshing = true;
+  $('refreshBtn').classList.add('spinning');
+  try {
+    fetch('/api/usage/refresh', { method: 'POST' }).catch(() => {});
+    await refresh();
+  } finally {
+    setTimeout(() => {
+      $('refreshBtn').classList.remove('spinning');
+      refreshing = false;
+    }, 2000);
+  }
+});
+
+/* ---------- 语言切换 ---------- */
+$('langBtn').addEventListener('click', () => {
+  lang = lang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('lang', lang);
+  applyI18n();
+  buildLegend();
+  refresh();
+  drawChart();
+});
+
+/* ---------- 主题切换 ---------- */
+$('themeBtn').addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark', true));
+matchMedia('(prefers-color-scheme: light)').addEventListener('change', (event) => {
+  if (!localStorage.getItem('sw-theme')) applyTheme(event.matches ? 'light' : 'dark');
+});
+
+/* ---------- 主循环 ---------- */
+async function refresh() {
+  try {
+    const res = await fetch('/api/stats');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    update(await res.json());
+    document.body.classList.remove('degraded');
+  } catch (e) {
+    $('dot').className = 'status-dot off';
+    document.body.classList.add('degraded');
+  }
+}
+function start() {
+  clearInterval(timer);
+  refresh();
+  timer = setInterval(refresh, 1500);
+}
+document.addEventListener('visibilitychange', () => (document.hidden ? clearInterval(timer) : start()));
+setInterval(() => { $('clock').textContent = new Date().toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US'); }, 1000);
+window.addEventListener('resize', () => { if (zoomOn) applyZoom(); drawChart(); });
+applyZoom();
+applyTheme(theme);
+start();
+</script>
+</body>
+</html>

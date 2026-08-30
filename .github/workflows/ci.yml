@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        node: [18, 22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Syntax check
+        run: node --check server.js && node --check usage.js && node --check custom.js && node --check http-security.js && node --check cli.js
+      - name: Tests
+        run: npm test
+      - name: Swift typecheck
+        run: swiftc -typecheck float/StatusWeaveFloat.swift -framework Cocoa -framework WebKit
+      - name: Smoke test
+        run: |
+          node server.js &
+          SVPID=$!
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8787/api/health && break || sleep 1
+          done
+          curl -sf http://localhost:8787/ | grep -q StatusWeave
+          curl -sf http://localhost:8787/api/stats | grep -q '"cpu"'
+          kill $SVPID
