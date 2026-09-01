@@ -16,6 +16,14 @@
       const savedTheme = localStorage.getItem('sw-theme');
       document.documentElement.dataset.theme = savedTheme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
     } catch { document.documentElement.dataset.theme = 'dark'; }
+    try {
+      const savedLang = localStorage.getItem('sw-lang');
+      const lang = savedLang === 'zh' || savedLang === 'en'
+        ? savedLang
+        : ((navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en');
+      document.documentElement.dataset.lang = lang;
+      document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    } catch { document.documentElement.dataset.lang = 'en'; }
   </script>
   <style>
     /* ============ TOKENS ============ */
@@ -162,6 +170,8 @@
       min-width: 34px; min-height: 32px; padding: 3px 8px; color: var(--cyan); background: var(--panel-2);
       border: 2px solid var(--line-hard); box-shadow: var(--px-shadow-sm); font: 700 13px var(--mono); cursor: pointer;
     }
+    .language-toggle { min-width: 52px; }
+    .statusline b, .status-tag b { font: inherit; }
 
     /* ============ HERO ============ */
     .hero { padding: 64px 0 88px; text-align: center; position: relative; }
@@ -327,11 +337,12 @@
       <span>STATUS<em>WEAVE</em></span>
     </a>
     <div class="nav-links">
-      <a href="#agent">Use with AI</a>
-      <a href="#features">Features</a>
-      <a href="#delivery">Delivery</a>
-      <a href="#quick-start">Install</a>
+      <a href="#agent" data-i18n="navAgent">Use with AI</a>
+      <a href="#features" data-i18n="navFeatures">Features</a>
+      <a href="#delivery" data-i18n="navDelivery">Delivery</a>
+      <a href="#quick-start" data-i18n="navInstall">Install</a>
       <a href="https://github.com/IndexFziQ/statusweave">GitHub ↗</a>
+      <button class="theme-toggle language-toggle" id="lang-toggle" type="button" aria-label="切换到中文">中文</button>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light theme" aria-pressed="false">◐</button>
     </div>
   </nav>
@@ -344,26 +355,26 @@
       <svg class="sprite s3" width="24" height="24" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="2" height="2" fill="#f0b83c"/><rect x="5" y="1" width="2" height="2" fill="#f0b83c"/><rect x="3" y="3" width="2" height="2" fill="#f0b83c"/><rect x="1" y="5" width="2" height="2" fill="#f0b83c"/><rect x="5" y="5" width="2" height="2" fill="#f0b83c"/></svg>
 
       <div class="statusline" aria-label="Project status">
-        <span><i class="lamp green"></i>Local-first</span>
-        <span><i class="lamp green"></i>MIT license</span>
-        <span><i class="lamp cyan"></i>npm package live</span>
-        <span><i class="lamp dim"></i>No telemetry</span>
+        <span><i class="lamp green"></i><b data-i18n="statusLocal">Local-first</b></span>
+        <span><i class="lamp green"></i><b data-i18n="statusLicense">MIT license</b></span>
+        <span><i class="lamp cyan"></i><b data-i18n="statusNpm">npm package live</b></span>
+        <span><i class="lamp dim"></i><b data-i18n="statusTelemetry">No telemetry</b></span>
       </div>
 
-      <span class="tag">AI usage monitor · macOS</span>
-      <h1>Your AI coding usage.<br><span class="accent">One local console.</span></h1>
-      <p class="lede">StatusWeave is a local-first macOS monitor for membership and usage status from supported AI coding services — plus your Mac's system health — rendered on a localhost dashboard you control, with a read-only REST API your coding agent can query.</p>
+      <span class="tag" data-i18n="heroTag">AI usage monitor · macOS</span>
+      <h1><span data-i18n="heroTitle1">Your AI coding usage.</span><br><span class="accent" data-i18n="heroTitle2">One local console.</span></h1>
+      <p class="lede" data-i18n="heroLede">StatusWeave is a local-first macOS monitor for membership and usage status from supported AI coding services — plus your Mac's system health — rendered on a localhost dashboard you control, with a read-only REST API your coding agent can query.</p>
       <div class="actions">
-        <a class="btn primary" href="#quick-start">▶ Install with npx</a>
-        <a class="btn" href="https://github.com/IndexFziQ/statusweave">View on GitHub ↗</a>
+        <a class="btn primary" href="#quick-start" data-i18n="heroInstall">▶ Install with npx</a>
+        <a class="btn" href="https://github.com/IndexFziQ/statusweave" data-i18n="heroGithub">View on GitHub ↗</a>
       </div>
 
       <div class="hud px-panel" aria-hidden="true">
-        <div class="hud-head"><span>statusweave · live readout (demo)</span><span>localhost:8787</span></div>
+        <div class="hud-head"><span data-i18n="hudHead">statusweave · live readout (demo)</span><span>localhost:8787</span></div>
         <div class="hud-row"><span class="name">CPU</span><span class="bar"></span><span class="val">70%</span></div>
         <div class="hud-row"><span class="name">MEMORY</span><span class="bar b-cyan"></span><span class="val" style="color:var(--cyan)">52%</span></div>
         <div class="hud-row"><span class="name">GPU</span><span class="bar b-amber"></span><span class="val" style="color:var(--amber)">34%</span></div>
-        <div class="hud-row"><span class="name">AI QUOTA</span><span class="bar b-cyan"></span><span class="val" style="color:var(--cyan)">52%</span></div>
+        <div class="hud-row"><span class="name" data-i18n="hudQuota">AI QUOTA</span><span class="bar b-cyan"></span><span class="val" style="color:var(--cyan)">52%</span></div>
       </div>
     </header>
 
@@ -371,16 +382,16 @@
     <section id="agent">
       <div class="wrap split">
         <div>
-          <span class="kicker">Side quest · agent-assisted install</span>
-          <h2>One sentence to your agent.</h2>
-          <p class="section-lede">Hand Claude Code, Codex, or Kimi a single prompt: read the install contract, run the npm install, and open the local monitor. You complete any official provider login yourself; the agent does not control your accounts and does not automatically discover every service you use.</p>
+          <span class="kicker" data-i18n="agentKicker">Side quest · agent-assisted install</span>
+          <h2 data-i18n="agentTitle">One sentence to your agent.</h2>
+          <p class="section-lede" data-i18n="agentLede">Hand Claude Code, Codex, or Kimi a single prompt: read the install contract, run the npm install, and open the local monitor. You complete any official provider login yourself; the agent does not control your accounts and does not automatically discover every service you use.</p>
         </div>
         <div class="terminal">
-          <div class="terminal-head"><span class="dots"><i></i><i></i><i></i></span>prompt.txt — paste into your agent</div>
-          <pre id="agent-prompt" style="white-space:pre-wrap">请安装并启动 https://github.com/IndexFziQ/statusweave。先阅读仓库里的 AGENT_INSTALL.md，再按文档执行 npm 安装（npx statusweave），完成环境检查、Claude Code/Codex/Kimi 检测、监控设置、启动和验证。已有官方 CLI 登录直接复用；如果需要登录、MFA、账号选择、目录 Trust 或终端 [y/N] 确认，必须停下来交给我本人操作。不要在对话、日志或非官方域名中输出或上传凭据。完成后打开 http://127.0.0.1:8787，并报告每家的实际可用状态。</pre>
+          <div class="terminal-head"><span class="dots"><i></i><i></i><i></i></span><span data-i18n="agentTerminal">prompt.txt — paste into your agent</span></div>
+          <pre id="agent-prompt" data-i18n="agentPrompt" style="white-space:pre-wrap">Install and launch https://github.com/IndexFziQ/statusweave. First read AGENT_INSTALL.md in the repository, then follow the documented npm install (npx statusweave) to check the environment, detect Claude Code/Codex/Kimi, configure monitoring, launch, and verify. Reuse existing official CLI logins. If login, MFA, account selection, directory Trust, or a terminal [y/N] confirmation is required, stop and hand control to me. Never print or upload credentials in chat, logs, or to non-official domains. When finished, open http://127.0.0.1:8787 and report the actual availability of each provider.</pre>
           <div class="copy-row">
-            <span class="copy-hint">// install shortcut; logins remain yours</span>
-            <button id="copy-prompt" class="copy-btn" type="button" aria-live="polite">[ COPY PROMPT ]</button>
+            <span class="copy-hint" data-i18n="agentHint">// install shortcut; logins remain yours</span>
+            <button id="copy-prompt" class="copy-btn" type="button" aria-live="polite" data-i18n="copyPrompt">[ COPY PROMPT ]</button>
           </div>
         </div>
       </div>
@@ -389,42 +400,42 @@
     <!-- ================= FEATURES ================= -->
     <section id="features">
       <div class="wrap">
-        <span class="kicker">Quest log · built-in sources</span>
-        <h2>AI usage front and center. System health built in.</h2>
-        <p class="section-lede">Supported AI coding usage appears after explicit setup of the providers you choose; Mac system health works immediately, no account required.</p>
+        <span class="kicker" data-i18n="featuresKicker">Quest log · built-in sources</span>
+        <h2 data-i18n="featuresTitle">AI usage front and center. System health built in.</h2>
+        <p class="section-lede" data-i18n="featuresLede">Supported AI coding usage appears after explicit setup of the providers you choose; Mac system health works immediately, no account required.</p>
         <div class="grid">
           <article class="card px-panel">
             <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="6" height="6" fill="none" stroke="#4be08c"/><rect x="3" y="3" width="2" height="2" fill="#4be08c"/><rect x="3" y="0" width="2" height="1" fill="#4be08c"/><rect x="3" y="7" width="2" height="1" fill="#4be08c"/><rect x="0" y="3" width="1" height="2" fill="#4be08c"/><rect x="7" y="3" width="1" height="2" fill="#4be08c"/></svg></span>
-            <h3>System health</h3>
-            <p>CPU, memory, swap, disk, load, GPU, processes, and per-app memory — the macOS metrics already supported today.</p>
+            <h3 data-i18n="featureSystemTitle">System health</h3>
+            <p data-i18n="featureSystemText">CPU, memory, swap, disk, load, GPU, processes, and per-app memory — the macOS metrics already supported today.</p>
           </article>
           <article class="card px-panel">
             <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="2" y="0" width="4" height="1" fill="#3fd6e8"/><rect x="1" y="1" width="6" height="2" fill="#3fd6e8"/><rect x="1" y="3" width="2" height="2" fill="#3fd6e8"/><rect x="5" y="3" width="2" height="2" fill="#3fd6e8"/><rect x="1" y="5" width="6" height="2" fill="#3fd6e8"/><rect x="2" y="7" width="4" height="1" fill="#3fd6e8"/></svg></span>
-            <h3>Claude usage</h3>
-            <p>Limit windows when available, plus local token statistics from the supported Claude integration after opt-in.</p>
+            <h3 data-i18n="featureClaudeTitle">Claude usage</h3>
+            <p data-i18n="featureClaudeText">Limit windows when available, plus local token statistics from the supported Claude integration after opt-in.</p>
           </article>
           <article class="card px-panel">
             <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="0" y="1" width="3" height="1" fill="#9d8df1"/><rect x="5" y="1" width="3" height="1" fill="#9d8df1"/><rect x="0" y="2" width="1" height="4" fill="#9d8df1"/><rect x="7" y="2" width="1" height="4" fill="#9d8df1"/><rect x="0" y="6" width="3" height="1" fill="#9d8df1"/><rect x="5" y="6" width="3" height="1" fill="#9d8df1"/><rect x="3" y="3" width="2" height="2" fill="#9d8df1"/></svg></span>
-            <h3>Codex usage</h3>
-            <p>Available quota windows and local token statistics after explicit Codex monitoring setup.</p>
+            <h3 data-i18n="featureCodexTitle">Codex usage</h3>
+            <p data-i18n="featureCodexText">Available quota windows and local token statistics after explicit Codex monitoring setup.</p>
           </article>
           <article class="card px-panel">
             <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="0" width="2" height="3" fill="#f0b83c"/><rect x="5" y="0" width="2" height="3" fill="#f0b83c"/><rect x="2" y="3" width="4" height="2" fill="#f0b83c"/><rect x="1" y="5" width="2" height="3" fill="#f0b83c"/><rect x="5" y="5" width="2" height="3" fill="#f0b83c"/></svg></span>
-            <h3>Kimi usage</h3>
-            <p>Available membership-limit signals and local token statistics after explicit Kimi monitoring setup.</p>
+            <h3 data-i18n="featureKimiTitle">Kimi usage</h3>
+            <p data-i18n="featureKimiText">Available membership-limit signals and local token statistics after explicit Kimi monitoring setup.</p>
           </article>
           <article class="card px-panel">
             <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="0" y="0" width="8" height="1" fill="#3fd6e8"/><rect x="0" y="0" width="1" height="8" fill="#3fd6e8"/><rect x="7" y="0" width="1" height="8" fill="#3fd6e8"/><rect x="0" y="7" width="8" height="1" fill="#3fd6e8"/><rect x="1" y="3" width="6" height="1" fill="#3fd6e8"/><rect x="3" y="1" width="1" height="6" fill="#3fd6e8"/></svg></span>
-            <h3>Read-only REST API</h3>
-            <p>JSON endpoints on localhost that coding agents can read — values and percentages via simple GET responses and JSON paths.</p>
+            <h3 data-i18n="featureApiTitle">Read-only REST API</h3>
+            <p data-i18n="featureApiText">JSON endpoints on localhost that coding agents can read — values and percentages via simple GET responses and JSON paths.</p>
           </article>
           <article class="card px-panel">
             <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="1" height="1" fill="#4be08c"/><rect x="2" y="2" width="1" height="1" fill="#4be08c"/><rect x="3" y="3" width="1" height="1" fill="#4be08c"/><rect x="2" y="4" width="1" height="1" fill="#4be08c"/><rect x="1" y="5" width="1" height="1" fill="#4be08c"/><rect x="5" y="5" width="3" height="1" fill="#4be08c"/></svg></span>
-            <h3>Any local command</h3>
-            <p>Turn command output into a monitored value with JSON paths or regex, as an opt-in custom source.</p>
+            <h3 data-i18n="featureCommandTitle">Any local command</h3>
+            <p data-i18n="featureCommandText">Turn command output into a monitored value with JSON paths or regex, as an opt-in custom source.</p>
           </article>
         </div>
-        <p style="color:var(--faint);font-size:12px;margin-top:18px">// AI service integrations depend on upstream behavior and may change as those services evolve.</p>
+        <p style="color:var(--faint);font-size:12px;margin-top:18px" data-i18n="featuresNote">// AI service integrations depend on upstream behavior and may change as those services evolve.</p>
       </div>
     </section>
 
@@ -432,9 +443,9 @@
     <section id="customize">
       <div class="wrap split">
         <div>
-          <span class="kicker">Crafting · bring your own source</span>
-          <h2>Mod your own console.</h2>
-          <p class="section-lede">Add an HTTP endpoint or local command without rebuilding StatusWeave. Authenticated HTTPS JSON APIs keep their Bearer key in macOS Keychain — never in agent chat or configuration files.</p>
+          <span class="kicker" data-i18n="customKicker">Crafting · bring your own source</span>
+          <h2 data-i18n="customTitle">Mod your own console.</h2>
+          <p class="section-lede" data-i18n="customLede">Add an HTTP endpoint or local command without rebuilding StatusWeave. Authenticated HTTPS JSON APIs keep their Bearer key in macOS Keychain — never in agent chat or configuration files.</p>
         </div>
         <div class="terminal">
           <div class="terminal-head"><span class="dots"><i></i><i></i><i></i></span>~/.statusweave/providers.json</div>
@@ -456,25 +467,25 @@
     <!-- ================= DELIVERY ================= -->
     <section id="delivery">
       <div class="wrap">
-        <span class="kicker">Save points · delivery status</span>
-        <h2>What is playable today.</h2>
-        <p class="section-lede">Honest checkpoint markers — no vaporware on this map.</p>
+        <span class="kicker" data-i18n="deliveryKicker">Save points · delivery status</span>
+        <h2 data-i18n="deliveryTitle">What is playable today.</h2>
+        <p class="section-lede" data-i18n="deliveryLede">Honest checkpoint markers — no vaporware on this map.</p>
         <div class="grid">
           <article class="card px-panel">
-            <span class="status-tag ok"><i class="lamp green"></i>Available</span>
-            <h3>HTML dashboard + REST</h3>
-            <p>One npx command starts the localhost dashboard and read-only JSON endpoints your coding agent can query.</p>
+            <span class="status-tag ok"><i class="lamp green"></i><b data-i18n="available">Available</b></span>
+            <h3 data-i18n="deliveryHtmlTitle">HTML dashboard + REST</h3>
+            <p data-i18n="deliveryHtmlText">One npx command starts the localhost dashboard and read-only JSON endpoints your coding agent can query.</p>
           </article>
           <article class="card px-panel">
-            <span class="status-tag ok"><i class="lamp green"></i>Available</span>
+            <span class="status-tag ok"><i class="lamp green"></i><b data-i18n="available">Available</b></span>
             <h3>npm package</h3>
-            <p>Published on npm. <code>npx statusweave</code> is the recommended one-line install; no clone or build step needed.</p>
+            <p><span data-i18n="deliveryNpmBefore">Published on npm. </span><code>npx statusweave</code><span data-i18n="deliveryNpmAfter"> is the recommended one-line install; no clone or build step needed.</span></p>
           </article>
           <article class="card px-panel">
-            <span class="status-tag wait"><i class="lamp amber"></i>Beta · unsigned</span>
-            <h3>Floating window / DMG</h3>
-            <p>Apple-silicon companion app for the local dashboard. Run <code>npx statusweave</code> first. If blocked, use System Settings → Privacy &amp; Security → Open Anyway.</p>
-            <a class="btn" href="https://github.com/IndexFziQ/statusweave/releases/latest/download/StatusWeave-macOS-arm64.dmg">↓ Download DMG</a>
+            <span class="status-tag wait"><i class="lamp amber"></i><b data-i18n="betaUnsigned">Beta · unsigned</b></span>
+            <h3 data-i18n="deliveryDmgTitle">Floating window / DMG</h3>
+            <p><span data-i18n="deliveryDmgBefore">Apple-silicon companion app for the local dashboard. Run </span><code>npx statusweave</code><span data-i18n="deliveryDmgAfter"> first. If blocked, use System Settings → Privacy &amp; Security → Open Anyway.</span></p>
+            <a class="btn" href="https://github.com/IndexFziQ/statusweave/releases/latest/download/StatusWeave-macOS-arm64.dmg" data-i18n="downloadDmg">↓ Download DMG</a>
           </article>
         </div>
       </div>
@@ -483,18 +494,18 @@
     <!-- ================= PRIVACY ================= -->
     <section>
       <div class="wrap">
-        <span class="kicker">Shield stats · local-first</span>
-        <h2>Local by default. External access is explicit.</h2>
+        <span class="kicker" data-i18n="privacyKicker">Shield stats · local-first</span>
+        <h2 data-i18n="privacyTitle">Local by default. External access is explicit.</h2>
         <div class="duo" style="margin-top:30px">
           <article class="card px-panel">
             <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="3" width="6" height="4" fill="none" stroke="#4be08c"/><rect x="2" y="1" width="4" height="2" fill="none" stroke="#4be08c"/><rect x="3" y="4" width="2" height="2" fill="#4be08c"/></svg></span>
-            <h3>Local by default</h3>
-            <p>The dashboard and REST API bind to localhost. Enabled AI integrations contact only their provider domains; StatusWeave has no telemetry and no hosted backend.</p>
+            <h3 data-i18n="privacyLocalTitle">Local by default</h3>
+            <p data-i18n="privacyLocalText">The dashboard and REST API bind to localhost. Enabled AI integrations contact only their provider domains; StatusWeave has no telemetry and no hosted backend.</p>
           </article>
           <article class="card px-panel">
             <span class="icon"><svg width="28" height="28" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true"><rect x="0" y="0" width="3" height="3" fill="#3fd6e8"/><rect x="5" y="0" width="3" height="3" fill="#2a3347"/><rect x="0" y="5" width="3" height="3" fill="#2a3347"/><rect x="5" y="5" width="3" height="3" fill="#3fd6e8"/></svg></span>
-            <h3>External sources are opt-in</h3>
-            <p>Custom HTTP and command sources stay disabled until you explicitly enable and configure them yourself.</p>
+            <h3 data-i18n="privacyExternalTitle">External sources are opt-in</h3>
+            <p data-i18n="privacyExternalText">Custom HTTP and command sources stay disabled until you explicitly enable and configure them yourself.</p>
           </article>
         </div>
       </div>
@@ -504,10 +515,10 @@
     <section id="quick-start">
       <div class="wrap split">
         <div>
-          <span class="kicker">New game · quick start</span>
-          <h2>One command.</h2>
-          <p class="section-lede">No hosted account, no database, no clone. Requirements: macOS and Node.js 18+. The first launch opens the dashboard automatically. Provider login may still require your own action.</p>
-          <a class="btn" href="https://github.com/IndexFziQ/statusweave">Read the docs ↗</a>
+          <span class="kicker" data-i18n="quickKicker">New game · quick start</span>
+          <h2 data-i18n="quickTitle">One command.</h2>
+          <p class="section-lede" data-i18n="quickLede">No hosted account, no database, no clone. Requirements: macOS and Node.js 18+. The first launch opens the dashboard automatically. Provider login may still require your own action.</p>
+          <a class="btn" href="https://github.com/IndexFziQ/statusweave" data-i18n="quickDocs">Read the docs ↗</a>
         </div>
         <div class="terminal" aria-label="Installation commands">
           <div class="terminal-head"><span class="dots"><i></i><i></i><i></i></span>terminal — zsh</div>
@@ -523,9 +534,9 @@
     <section>
       <div class="wrap open-box px-panel">
         <div>
-          <span class="kicker">Open source</span>
-          <h2>Free to play, free to build on.</h2>
-          <p>StatusWeave uses the permissive MIT License. Use it privately or commercially, modify it, distribute it, and build on it — while preserving the license notice.</p>
+          <span class="kicker" data-i18n="licenseKicker">Open source</span>
+          <h2 data-i18n="licenseTitle">Free to play, free to build on.</h2>
+          <p data-i18n="licenseText">StatusWeave uses the permissive MIT License. Use it privately or commercially, modify it, distribute it, and build on it — while preserving the license notice.</p>
         </div>
         <span class="license-badge">MIT LICENSE</span>
       </div>
@@ -533,22 +544,66 @@
 
     <!-- ================= FINAL ================= -->
     <section class="final wrap">
-      <span class="kicker" style="justify-content:center;display:inline-flex">Final stage</span>
-      <h2>Stop checking separate places for one answer.</h2>
+      <span class="kicker" style="justify-content:center;display:inline-flex" data-i18n="finalKicker">Final stage</span>
+      <h2 data-i18n="finalTitle">Stop checking separate places for one answer.</h2>
       <div class="actions">
-        <a class="btn primary" href="#quick-start">▶ Run StatusWeave</a>
-        <a class="btn" href="https://github.com/IndexFziQ/statusweave">☆ Star on GitHub</a>
+        <a class="btn primary" href="#quick-start" data-i18n="finalRun">▶ Run StatusWeave</a>
+        <a class="btn" href="https://github.com/IndexFziQ/statusweave" data-i18n="finalStar">☆ Star on GitHub</a>
       </div>
     </section>
   </main>
 
   <footer class="wrap">
-    <span>© 2026 StatusWeave contributors</span>
-    <span>Open source under the MIT License · Local-first · No telemetry</span>
+    <span data-i18n="footerCopyright">© 2026 StatusWeave contributors</span>
+    <span data-i18n="footerTagline">Open source under the MIT License · Local-first · No telemetry</span>
   </footer>
 
   <script>
     (function () {
+      var zh = {
+        navAgent: '配合 AI 使用', navFeatures: '功能', navDelivery: '交付状态', navInstall: '安装',
+        statusLocal: '本地优先', statusLicense: 'MIT 许可证', statusNpm: 'npm 包已上线', statusTelemetry: '无遥测',
+        heroTag: 'AI 用量监控 · macOS', heroTitle1: '你的 AI 编程用量。', heroTitle2: '一个本地控制台。',
+        heroLede: 'StatusWeave 是一个本地优先的 macOS 监控工具，用于查看受支持的 AI 编程服务会员与用量状态，以及 Mac 系统健康状况——全部呈现在由你掌控的 localhost 仪表盘上，并提供只读 REST API 供编程 Agent 查询。',
+        heroInstall: '▶ 使用 npx 安装', heroGithub: '在 GitHub 查看 ↗', hudHead: 'statusweave · 实时读数（演示）', hudQuota: 'AI 配额',
+        agentKicker: '支线任务 · Agent 辅助安装', agentTitle: '一句话交给你的 Agent。',
+        agentLede: '把一条 prompt 交给 Claude Code、Codex 或 Kimi：阅读安装约定，执行 npm 安装，然后打开本地监控。任何官方服务商登录都由你本人完成；Agent 不会控制你的账号，也不会自动发现你使用的所有服务。',
+        agentTerminal: 'prompt.txt — 粘贴给你的 Agent',
+        agentPrompt: '请安装并启动 https://github.com/IndexFziQ/statusweave。先阅读仓库里的 AGENT_INSTALL.md，再按文档执行 npm 安装（npx statusweave），完成环境检查、Claude Code/Codex/Kimi 检测、监控设置、启动和验证。已有官方 CLI 登录直接复用；如果需要登录、MFA、账号选择、目录 Trust 或终端 [y/N] 确认，必须停下来交给我本人操作。不要在对话、日志或非官方域名中输出或上传凭据。完成后打开 http://127.0.0.1:8787，并报告每家的实际可用状态。',
+        agentHint: '// 安装捷径；登录仍由你本人完成', copyPrompt: '[ 复制 PROMPT ]',
+        featuresKicker: '任务日志 · 内置数据源', featuresTitle: 'AI 用量居中呈现，系统健康内置其中。',
+        featuresLede: '受支持的 AI 编程用量会在你显式设置所选服务商后显示；Mac 系统健康开箱即用，无需任何账号。',
+        featureSystemTitle: '系统健康', featureSystemText: 'CPU、内存、swap、磁盘、负载、GPU、进程以及按应用统计的内存——目前已支持的 macOS 指标。',
+        featureClaudeTitle: 'Claude 用量', featureClaudeText: '在可用时显示限额窗口，并在显式启用受支持的 Claude 集成后提供本地 token 统计。',
+        featureCodexTitle: 'Codex 用量', featureCodexText: '显式设置 Codex 监控后，显示可用的配额窗口与本地 token 统计。',
+        featureKimiTitle: 'Kimi 用量', featureKimiText: '显式设置 Kimi 监控后，显示可用的会员限额信号与本地 token 统计。',
+        featureApiTitle: '只读 REST API', featureApiText: 'localhost 上的 JSON 端点，供编程 Agent 读取——通过简单的 GET 响应和 JSON 路径获取数值与百分比。',
+        featureCommandTitle: '任意本地命令', featureCommandText: '通过 JSON 路径或正则，把命令输出变成可监控的数值，作为可选启用的自定义数据源。',
+        featuresNote: '// AI 服务集成依赖上游行为，可能随这些服务的演进而变化。',
+        customKicker: '打造 · 自带数据源', customTitle: '改装你自己的控制台。',
+        customLede: '无需重新构建 StatusWeave，即可添加 HTTP 端点或本地命令。需要鉴权的 HTTPS JSON API 会把 Bearer 密钥保存在 macOS 钥匙串中——绝不出现在 Agent 对话或配置文件里。',
+        deliveryKicker: '存档点 · 交付状态', deliveryTitle: '今天已经能使用什么。', deliveryLede: '诚实的进度标记——这张地图上没有画饼。',
+        available: '可用', deliveryHtmlTitle: 'HTML 仪表盘 + REST', deliveryHtmlText: '一条 npx 命令即可启动 localhost 仪表盘和只读 JSON 端点，供编程 Agent 查询。',
+        deliveryNpmBefore: '已发布到 npm。', deliveryNpmAfter: ' 是推荐的一行安装方式，无需克隆或构建。',
+        betaUnsigned: 'Beta · 未签名', deliveryDmgTitle: '悬浮窗 / DMG', deliveryDmgBefore: '面向本地仪表盘的 Apple silicon 伴侣应用。请先运行 ',
+        deliveryDmgAfter: '。若被拦截，请在“系统设置 → 隐私与安全性 → 仍要打开”中允许。', downloadDmg: '↓ 下载 DMG',
+        privacyKicker: '护盾属性 · 本地优先', privacyTitle: '默认本地运行，外部访问显式开启。', privacyLocalTitle: '默认本地运行',
+        privacyLocalText: '仪表盘和 REST API 仅绑定 localhost。已启用的 AI 集成只访问各自服务商域名；StatusWeave 没有遥测，也没有托管后端。',
+        privacyExternalTitle: '外部数据源需手动启用', privacyExternalText: '自定义 HTTP 和命令数据源保持禁用状态，直到你亲自显式启用并配置它们。',
+        quickKicker: '新游戏 · 快速开始', quickTitle: '一条命令。', quickLede: '无需托管账号、无需数据库、无需克隆。要求：macOS 和 Node.js 18+。首次启动会自动打开仪表盘；服务商登录可能仍需你本人操作。', quickDocs: '阅读文档 ↗',
+        licenseKicker: '开源', licenseTitle: '免费使用，也欢迎自由扩展。', licenseText: 'StatusWeave 采用宽松的 MIT License。你可以私用或商用、修改、分发并在其上继续构建，只需保留许可证声明。',
+        finalKicker: '最终关卡', finalTitle: '不必再去多个地方寻找同一个答案。', finalRun: '▶ 运行 StatusWeave', finalStar: '☆ 在 GitHub 点 Star',
+        footerCopyright: '© 2026 StatusWeave 贡献者', footerTagline: '基于 MIT License 开源 · 本地优先 · 无遥测'
+      };
+      var dynamic = {
+        en: { copyDone: '[ COPIED ✓ ]', copySelect: '[ SELECT + ⌘C ]', themeLight: 'Switch to light theme', themeDark: 'Switch to dark theme', langSwitch: 'Switch to Chinese' },
+        zh: { copyDone: '[ 已复制 ✓ ]', copySelect: '[ 选择 + ⌘C ]', themeLight: '切换到浅色模式', themeDark: '切换到深色模式', langSwitch: '切换到英文' }
+      };
+      var languageButton = document.getElementById('lang-toggle');
+      var translatable = document.querySelectorAll('[data-i18n]');
+      var language = document.documentElement.dataset.lang === 'zh' ? 'zh' : 'en';
+      for (var i = 0; i < translatable.length; i += 1) translatable[i].dataset.i18nEn = translatable[i].textContent;
+
       var themeButton = document.getElementById('theme-toggle');
       var themeMeta = document.querySelector('meta[name="theme-color"]');
       var theme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
@@ -557,25 +612,40 @@
         document.documentElement.dataset.theme = theme;
         themeButton.textContent = theme === 'light' ? '◑' : '◐';
         themeButton.setAttribute('aria-pressed', String(theme === 'light'));
-        themeButton.setAttribute('aria-label', theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+        themeButton.setAttribute('aria-label', theme === 'light' ? dynamic[language].themeDark : dynamic[language].themeLight);
         themeButton.title = themeButton.getAttribute('aria-label');
         themeMeta.content = theme === 'light' ? '#e9edf2' : '#0a0d14';
-        if (persist) localStorage.setItem('sw-theme', theme);
+        if (persist) try { localStorage.setItem('sw-theme', theme); } catch (e) {}
+      }
+      function applyLanguage(next, persist) {
+        language = next === 'zh' ? 'zh' : 'en';
+        document.documentElement.dataset.lang = language;
+        document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+        for (var i = 0; i < translatable.length; i += 1) {
+          var node = translatable[i];
+          node.textContent = language === 'zh' ? zh[node.dataset.i18n] : node.dataset.i18nEn;
+        }
+        languageButton.textContent = language === 'zh' ? 'EN' : '中文';
+        languageButton.setAttribute('aria-label', dynamic[language].langSwitch);
+        languageButton.title = dynamic[language].langSwitch;
+        applyTheme(theme, false);
+        if (persist) try { localStorage.setItem('sw-lang', language); } catch (e) {}
       }
       themeButton.addEventListener('click', function () { applyTheme(theme === 'light' ? 'dark' : 'light', true); });
+      languageButton.addEventListener('click', function () { applyLanguage(language === 'zh' ? 'en' : 'zh', true); });
       matchMedia('(prefers-color-scheme: light)').addEventListener('change', function (event) {
-        if (!localStorage.getItem('sw-theme')) applyTheme(event.matches ? 'light' : 'dark', false);
+        try { if (!localStorage.getItem('sw-theme')) applyTheme(event.matches ? 'light' : 'dark', false); } catch (e) {}
       });
-      applyTheme(theme, false);
+      applyLanguage(language, false);
 
       var btn = document.getElementById('copy-prompt');
       var src = document.getElementById('agent-prompt');
       btn.addEventListener('click', function () {
         var done = function () {
-          btn.textContent = '[ COPIED ✓ ]';
+          btn.textContent = dynamic[language].copyDone;
           btn.classList.add('done');
           setTimeout(function () {
-            btn.textContent = '[ COPY PROMPT ]';
+            btn.textContent = language === 'zh' ? zh.copyPrompt : btn.dataset.i18nEn;
             btn.classList.remove('done');
           }, 1800);
         };
@@ -588,7 +658,7 @@
           var s = window.getSelection();
           s.removeAllRanges();
           s.addRange(r);
-          try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = '[ SELECT + ⌘C ]'; }
+          try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = dynamic[language].copySelect; }
           s.removeAllRanges();
         }
       });
