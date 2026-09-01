@@ -5,8 +5,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const authorization = require('../authorization');
-const { enabledProviders } = require('../usage');
+const authorization = require('../src/authorization');
+const { enabledProviders } = require('../src/usage');
 
 function isolatedEnv() {
   return { ...process.env, STATUSWEAVE_STATE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'statusweave-auth-test-')) };

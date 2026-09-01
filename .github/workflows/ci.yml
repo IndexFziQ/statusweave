@@ -17,14 +17,14 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - name: Syntax check
-        run: node --check server.js && node --check usage.js && node --check custom.js && node --check http-security.js && node --check cli.js
+        run: for file in src/*.js; do node --check "$file"; done
       - name: Tests
         run: npm test
       - name: Swift typecheck
         run: swiftc -typecheck float/StatusWeaveFloat.swift -framework Cocoa -framework WebKit
       - name: Smoke test
         run: |
-          node server.js &
+          node src/server.js &
           SVPID=$!
           for i in $(seq 1 20); do
             curl -sf http://localhost:8787/api/health && break || sleep 1

@@ -9,8 +9,8 @@ const path = require('node:path');
 
 function loadCustom(config) {
   process.env.STATUSWEAVE_PROVIDERS = config;
-  delete require.cache[require.resolve('../custom')];
-  return require('../custom');
+  delete require.cache[require.resolve('../src/custom')];
+  return require('../src/custom');
 }
 
 test('custom command failures never return command text or secrets', async (t) => {

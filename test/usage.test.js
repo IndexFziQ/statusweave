@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
-const { collectUsage, enabledProviders, _test } = require('../usage');
+const { collectUsage, enabledProviders, _test } = require('../src/usage');
 
 test('AI providers are disabled by default', async () => {
   assert.deepEqual([...enabledProviders([], {})], []);

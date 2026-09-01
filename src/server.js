@@ -4,8 +4,8 @@
  * Zero dependencies (Node.js >= 18), provides REST API + visual dashboard
  *
  * Usage:
- *   node server.js          # default port 8787
- *   PORT=9000 node server.js
+ *   node src/server.js          # default port 8787
+ *   PORT=9000 node src/server.js
  *
  * API:
  *   GET /api/stats      all metrics (cpu/memory/swap/disk/load/processes...)
@@ -40,7 +40,7 @@ const HOST = process.env.STATUSWEAVE_HOST || '127.0.0.1';
 const CORS = process.env.STATUSWEAVE_CORS || '';
 const STARTUP_AI_PROVIDERS = usage.enabledProviders();
 const CUSTOM_ENABLED = process.env.STATUSWEAVE_ENABLE_CUSTOM === '1';
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const SAMPLE_INTERVAL = 1000; // sample once per second; the API serves the latest snapshot
 
 if (process.argv.includes('--help') || process.argv.includes('-h')) {

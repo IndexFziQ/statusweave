@@ -9,28 +9,18 @@
   "homepage": "https://indexfziq.github.io/statusweave/",
   "bugs": "https://github.com/IndexFziQ/statusweave/issues",
   "bin": {
-    "statusweave": "statusweave.js",
-    "statusweave-cli": "cli.js"
+    "statusweave": "src/statusweave.js",
+    "statusweave-cli": "src/cli.js"
   },
   "scripts": {
-    "start": "node server.js",
-    "cli": "node cli.js",
+    "start": "node src/server.js",
+    "cli": "node src/cli.js",
     "test": "node --test",
     "prepublishOnly": "npm test"
   },
   "publishConfig": { "access": "public" },
   "files": [
-    "server.js",
-    "statusweave.js",
-    "open-dashboard.js",
-    "agent.js",
-    "connect.js",
-    "cli.js",
-    "usage.js",
-    "authorization.js",
-    "custom.js",
-    "http-security.js",
-    "feedback.js",
+    "src/",
     "public/",
     "float/AppIcon.icns",
     "float/StatusWeaveFloat.swift",
@@ -38,7 +28,7 @@
     "README.md",
     "README.zh-CN.md",
     "AGENT_INSTALL.md",
-    "SECURITY.md",
+    ".github/SECURITY.md",
     "CHANGELOG.md",
     "LICENSE"
   ]

@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { isLoopbackHost, isAllowedOrigin, publicFile } = require('../http-security');
+const { isLoopbackHost, isAllowedOrigin, publicFile } = require('../src/http-security');
 
 test('local server rejects DNS-rebinding hostnames', () => {
   assert.equal(isLoopbackHost('127.0.0.1:8787'), true);

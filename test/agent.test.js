@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { detectedProviders, requestedProviders } = require('../agent');
+const { detectedProviders, requestedProviders } = require('../src/agent');
 
 test('agent detection reports auth state without returning credentials', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'statusweave-agent-'));

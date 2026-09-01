@@ -8,9 +8,9 @@ const http = require('node:http');
 const net = require('node:net');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
-const { openDashboard } = require('../open-dashboard');
+const { openDashboard } = require('../src/open-dashboard');
 
-const launcher = path.join(__dirname, '..', 'statusweave.js');
+const launcher = path.join(__dirname, '..', 'src', 'statusweave.js');
 
 async function getFreePort() {
   const server = net.createServer();

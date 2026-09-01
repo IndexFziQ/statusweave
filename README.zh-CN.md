@@ -72,7 +72,7 @@ Agent 可以检查环境、安装、启动和验证，但不能代你登录账�
 - **AI provider 默认全部关闭。** 授权只保存权限受限的同意元数据，不保存密码、API Key、OAuth Token 或终端输出。
 - **凭据限定去向。** Claude 和 Codex token 只发送到各自的服务端点；Kimi 状态通过本机已安装的 Kimi CLI 获取，遵循该 CLI 自身的正常联网行为。原始凭据不会从本地 API 返回。
 - **默认只监听本机回环。** 服务绑定 `127.0.0.1`，拒绝非 loopback 的 Host 头，CORS 默认关闭。
-- 数据流细节和漏洞报告方式见 [`SECURITY.md`](SECURITY.md)。
+- 数据流细节和漏洞报告方式见 [`SECURITY.md`](.github/SECURITY.md)。
 
 ## REST API
 
@@ -104,7 +104,7 @@ statusweave-cli --once --json
 ```bash
 git clone https://github.com/IndexFziQ/statusweave.git
 cd statusweave
-node statusweave.js
+node src/statusweave.js
 ```
 
 **浮动窗口 / DMG** 是面向 Apple 芯片的未签名 Beta 伴侣应用。它不会自己启动监控服务，并且可能被 Gatekeeper 拦截，因此仍推荐先使用 `npx statusweave`。
@@ -133,7 +133,7 @@ bash scripts/build-dmg.sh
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request，详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。安全问题请通过 [GitHub 私密漏洞报告](https://github.com/IndexFziQ/statusweave/security/advisories/new) 提交，不要开公开 Issue。
+欢迎提交 Issue 和 Pull Request，详见 [`CONTRIBUTING.md`](.github/CONTRIBUTING.md)。安全问题请通过 [GitHub 私密漏洞报告](https://github.com/IndexFziQ/statusweave/security/advisories/new) 提交，不要开公开 Issue。
 
 ## 许可
 

@@ -72,7 +72,7 @@ The agent may inspect the environment, install, launch, and verify. It must not 
 - **AI providers are off by default.** Authorization stores only consent metadata with private file permissions—never passwords, API keys, OAuth tokens, or terminal transcripts.
 - **Credentials stay scoped.** Claude and Codex tokens are sent only to their respective service endpoints; Kimi status is obtained through the installed Kimi CLI and follows that CLI's normal network behavior. Raw credentials are never returned by the local API.
 - **Loopback only by default.** The server binds to `127.0.0.1`, rejects non-loopback Host headers, and ships with CORS off.
-- Data-flow details and vulnerability reporting: [`SECURITY.md`](SECURITY.md).
+- Data-flow details and vulnerability reporting: [`SECURITY.md`](.github/SECURITY.md).
 
 ## REST API
 
@@ -104,7 +104,7 @@ statusweave-cli --once --json
 ```bash
 git clone https://github.com/IndexFziQ/statusweave.git
 cd statusweave
-node statusweave.js
+node src/statusweave.js
 ```
 
 **Floating window / DMG** is an unsigned Apple-silicon beta companion. It does not start the monitor service itself, and Gatekeeper may block it, so `npx statusweave` remains the recommended entry point.
@@ -133,7 +133,7 @@ Optional local state lives in `~/.statusweave/`; review it before deleting it. U
 
 ## Contributing
 
-Issues and pull requests are welcome—see [`CONTRIBUTING.md`](CONTRIBUTING.md). Please report security problems through [GitHub private vulnerability reporting](https://github.com/IndexFziQ/statusweave/security/advisories/new), not public issues.
+Issues and pull requests are welcome—see [`CONTRIBUTING.md`](.github/CONTRIBUTING.md). Please report security problems through [GitHub private vulnerability reporting](https://github.com/IndexFziQ/statusweave/security/advisories/new), not public issues.
 
 ## License
 

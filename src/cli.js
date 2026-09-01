@@ -4,7 +4,7 @@
 /** StatusWeave terminal renderer: the same console language, native to a TTY. */
 const { spawn } = require('child_process');
 const path = require('path');
-const tokens = require('./public/statusweave.tokens.json');
+const tokens = require('../public/statusweave.tokens.json');
 
 const PORT = process.env.PORT || 8787;
 const BASE = `http://127.0.0.1:${PORT}`;

@@ -3,7 +3,7 @@ import WebKit
 
 /// StatusWeave 前置浮动窗口
 /// 菜单栏 ⚡ 图标控制显示/隐藏;窗口始终浮于其他窗口之上(类似豆包前置窗)
-/// 依赖本地服务: http://localhost:8787 (先运行 `node server.js` 或 `statusweave`)
+/// 依赖本地服务: http://localhost:8787 (先运行 `npx statusweave` 或 `statusweave`)
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!

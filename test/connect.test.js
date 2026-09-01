@@ -3,8 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { endpoint, keychainAccount, keychainStore, KEYCHAIN_SERVICE } = require('../connect');
-const custom = require('../custom');
+const { endpoint, keychainAccount, keychainStore, KEYCHAIN_SERVICE } = require('../src/connect');
+const custom = require('../src/custom');
 
 test('authenticated endpoints are HTTPS and bound to their origin', () => {
   assert.equal(endpoint('https://api.example.com/usage#fragment').toString(), 'https://api.example.com/usage');

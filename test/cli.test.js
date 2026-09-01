@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const cli = path.join(__dirname, '..', 'cli.js');
+const cli = path.join(__dirname, '..', 'src', 'cli.js');
 
 test('CLI help documents native, plain, ASCII, and JSON renderers', () => {
   const result = spawnSync(process.execPath, [cli, '--help'], { encoding: 'utf8' });

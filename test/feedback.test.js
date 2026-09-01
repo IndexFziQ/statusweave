@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const feedback = require('../feedback');
+const feedback = require('../src/feedback');
 
 test('first-run feedback invite is local, optional, and shown only once', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'statusweave-feedback-'));
