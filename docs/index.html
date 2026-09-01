@@ -20,7 +20,7 @@
       const savedLang = localStorage.getItem('sw-lang');
       const lang = savedLang === 'zh' || savedLang === 'en'
         ? savedLang
-        : ((navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en');
+        : 'en';
       document.documentElement.dataset.lang = lang;
       document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
     } catch { document.documentElement.dataset.lang = 'en'; }
