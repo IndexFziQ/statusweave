@@ -147,11 +147,13 @@
   .command-copy { width: 100%; margin-top: 10px; padding: 8px 9px; color: var(--cyan); background: var(--card-inset); border: 1px solid var(--line); border-radius: 4px;
     cursor: pointer; overflow: hidden; font-size: 10px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
   .command-copy:hover { border-color: var(--cyan); }
-  .plan-rows { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 10px; }
-  .plan-row { display: flex; align-items: center; gap: 8px; font-size: 10px; }
-  .plan-label { width: 88px; flex-shrink: 0; color: var(--muted); white-space: nowrap; }
+  .plan-rows { display: flex; flex-direction: column; gap: 12px; margin: 2px 0 10px; }
+  .plan-row { display: flex; flex-direction: column; gap: 6px; font-size: 10px; }
+  .plan-info { display: flex; justify-content: space-between; align-items: center; }
+  .plan-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .plan-label { color: var(--muted); white-space: nowrap; }
   .plan-bar { height: 10px; flex: 1; margin: 0; } .plan-row b { width: 36px; flex-shrink: 0; text-align: right; }
-  .plan-reset { min-width: 88px; flex-shrink: 0; color: var(--muted); font-size: 9px; text-align: right; }
+  .plan-reset { color: var(--muted); font-size: 9px; text-align: right; }
   .share-row { display: flex; align-items: center; gap: 16px; margin-top: 14px; padding: 12px 6px 0; border-top: 1px solid var(--line); }
   .share-donut { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
   .share-donut svg { width: 88px; height: 88px; transform: rotate(-90deg); } .share-donut circle { fill: none; stroke-width: 13; }
@@ -634,10 +636,14 @@ function planRows(p) {
     const pct = Math.max(0, Math.min(100, Number(w.pct) || 0));
     return `
     <div class="plan-row">
-      <span class="plan-label">${esc((PLAN_LABELS[w.key] && PLAN_LABELS[w.key][lang]) || w.label)}</span>
-      <div class="xpbar plan-bar"><i style="width:${pct}%;background:${colorFor(pct)}"></i></div>
-      <b style="color:${cssColor(pct)}">${pct}%</b>
-      <span class="plan-reset">${esc(fmtReset(w))}</span>
+      <div class="plan-info">
+        <span class="plan-label">${esc((PLAN_LABELS[w.key] && PLAN_LABELS[w.key][lang]) || w.label)}</span>
+        <span class="plan-reset">${esc(fmtReset(w))}</span>
+      </div>
+      <div class="plan-bar-wrap">
+        <div class="xpbar plan-bar"><i style="width:${pct}%;background:${colorFor(pct)}"></i></div>
+        <b style="color:${cssColor(pct)}">${pct}%</b>
+      </div>
     </div>`;
   }).join('') + `</div>`;
 }
