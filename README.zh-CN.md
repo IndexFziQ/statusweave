@@ -117,7 +117,13 @@ node src/statusweave.js
 npx statusweave
 ```
 
-然后挂载 DMG，把 `StatusWeave.app` 拖进“应用程序”并尝试打开。如果 macOS 拦截未签名 Beta，请进入 **系统设置 → 隐私与安全性**，选择 **仍要打开**。使用 Xcode Command Line Tools 从源码构建 App 和 DMG：
+然后挂载 DMG，把 `StatusWeave.app` 拖进“应用程序”并尝试打开。如果 macOS 拦截未签名 Beta，请进入 **系统设置 → 隐私与安全性**，选择 **仍要打开**，或直接清除隔离标记：
+
+```bash
+xattr -d com.apple.quarantine /Applications/StatusWeave.app
+```
+
+如果 App 在监控服务启动前打开，窗口会显示启动提示，并在 `npx statusweave` 就绪后自动连接。使用 Xcode Command Line Tools 从源码构建 App 和 DMG：
 
 ```bash
 bash scripts/build-dmg.sh
@@ -129,7 +135,7 @@ bash scripts/build-dmg.sh
 - 全局安装：停止进程后运行 `npm uninstall -g statusweave`。
 - 源码安装：停止进程后删除克隆目录。
 
-可选的本机状态位于 `~/.statusweave/`，删除前请先确认内容。卸载不会退出任何 provider CLI；如需撤销监控同意，先运行 `statusweave authorize --reset <provider>`。
+可选的本机状态位于 `~/.statusweave/`，删除前请先确认内容。卸载不会退出任何 provider CLI；如需撤销监控同意，先运行 `npx statusweave authorize --reset <provider>`。
 
 ## 贡献
 

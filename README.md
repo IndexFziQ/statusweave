@@ -117,7 +117,13 @@ Keep the local monitor running before opening the app:
 npx statusweave
 ```
 
-Then mount the DMG, drag `StatusWeave.app` to Applications, and try opening it. If macOS blocks the unsigned beta, go to **System Settings → Privacy & Security** and choose **Open Anyway**. To build the companion and DMG from source with Xcode Command Line Tools:
+Then mount the DMG, drag `StatusWeave.app` to Applications, and try opening it. If macOS blocks the unsigned beta, go to **System Settings → Privacy & Security** and choose **Open Anyway**, or clear the quarantine flag directly:
+
+```bash
+xattr -d com.apple.quarantine /Applications/StatusWeave.app
+```
+
+If the app opens before the monitor is running, it shows a start-up hint and connects automatically once `npx statusweave` is up. To build the companion and DMG from source with Xcode Command Line Tools:
 
 ```bash
 bash scripts/build-dmg.sh
@@ -129,7 +135,7 @@ bash scripts/build-dmg.sh
 - Global install: stop the process, then run `npm uninstall -g statusweave`.
 - Source install: stop the process, then delete the cloned folder.
 
-Optional local state lives in `~/.statusweave/`; review it before deleting it. Uninstalling does not log out any provider CLI. Revoke monitoring consent first with `statusweave authorize --reset <provider>` if desired.
+Optional local state lives in `~/.statusweave/`; review it before deleting it. Uninstalling does not log out any provider CLI. Revoke monitoring consent first with `npx statusweave authorize --reset <provider>` if desired.
 
 ## Contributing
 

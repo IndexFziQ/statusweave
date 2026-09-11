@@ -1,6 +1,6 @@
 {
   "name": "statusweave",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first macOS monitor for AI coding usage and system health, with a read-only agent API.",
   "keywords": ["ai-coding", "usage-monitor", "claude-code", "codex", "kimi", "ai-agent", "macos", "system-monitor", "cpu", "memory", "cli", "dashboard"],
   "license": "MIT",

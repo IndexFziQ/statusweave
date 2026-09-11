@@ -474,8 +474,9 @@ async function codexUsage() {
 
 function kimiBin() {
   if (process.env.KIMI_BIN && fs.existsSync(process.env.KIMI_BIN)) return process.env.KIMI_BIN;
-  const p = path.join(os.homedir(), '.kimi-code', 'bin', 'kimi');
-  return fs.existsSync(p) ? p : null;
+  // Reuse the shared resolver so collection finds the same CLI that
+  // authorization found (PATH lookup plus well-known install locations).
+  return authorization.findExecutable('kimi');
 }
 
 function stripAnsi(s) {

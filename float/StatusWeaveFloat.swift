@@ -8,9 +8,10 @@ import WebKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private var statusItem: NSStatusItem!
+    private var port = "8787"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let port = ProcessInfo.processInfo.environment["PORT"] ?? "8787"
+        port = ProcessInfo.processInfo.environment["PORT"] ?? "8787"
 
         // 浮动窗口(默认 476x758,取自实际使用调校;用户拖过的尺寸位置会被记住)
         let rect = NSRect(x: 0, y: 0, width: 476, height: 758)
@@ -136,6 +137,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
+    /// The monitor server is not reachable: show an actionable placeholder
+    /// instead of a blank window, and auto-retry every 5 seconds.
+    private func showServerMissingPage(_ webView: WKWebView) {
+        let url = "http://localhost:\(port)"
+        let html = """
+        <!doctype html><html><head><meta charset="utf-8">
+        <meta http-equiv="refresh" content="5;url=\(url)">
+        <style>
+          body { margin:0; height:100vh; display:flex; align-items:center; justify-content:center;
+                 background:#0a0d14; color:#d7deeb; font:14px -apple-system,"PingFang SC",sans-serif; }
+          .box { max-width:340px; padding:0 28px; text-align:center; }
+          h1 { font-size:18px; margin:0 0 6px; }
+          p { color:#8b95a8; line-height:1.7; margin:10px 0; }
+          code { display:block; background:#131824; border:1px solid #232c40; border-radius:8px;
+                 padding:10px 12px; margin:14px 0; color:#7ee2a8;
+                 font:13px ui-monospace,Menlo,monospace; user-select:all; }
+          .hint { font-size:12px; color:#5b6577; }
+        </style></head><body><div class="box">
+          <h1>⚡ StatusWeave</h1>
+          <p>The local monitor is not running.<br>Start it in Terminal and this panel connects automatically.</p>
+          <code>npx statusweave</code>
+          <p>本地监控服务未运行。<br>在终端运行上面的命令,本窗口会自动连接。</p>
+          <p class="hint">Retrying every 5 s · 每 5 秒自动重试 · \(url)</p>
+        </div></body></html>
+        """
+        webView.loadHTMLString(html, baseURL: nil)
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false // 关窗不退出,驻留菜单栏
     }
@@ -165,6 +194,17 @@ extension AppDelegate: WKUIDelegate, WKNavigationDelegate {
             return
         }
         decisionHandler(.allow)
+    }
+
+    // Server not running (connection refused) or navigation failed midway —
+    // swap in the guided placeholder instead of leaving a blank panel.
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+                 withError error: Error) {
+        showServerMissingPage(webView)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        showServerMissingPage(webView)
     }
 }
 

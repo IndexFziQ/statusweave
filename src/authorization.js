@@ -86,6 +86,30 @@ function saveProvider(provider, patch, env = process.env) {
   return state.providers[provider];
 }
 
+/**
+ * Well-known install locations for provider CLIs. GUI apps, launch agents, and
+ * IDE-integrated terminals often run with a minimal PATH that misses the user's
+ * login-shell tools, so `which` alone reports installed CLIs as missing.
+ */
+function candidateBinDirs() {
+  const home = os.homedir();
+  const dirs = [
+    path.join(home, '.local', 'bin'),
+    path.join(home, '.kimi-code', 'bin'),
+    path.join(home, '.npm-global', 'bin'),
+    path.join(home, '.volta', 'bin'),
+    path.join(home, '.bun', 'bin'),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+  ];
+  // nvm keeps one bin directory per installed Node version
+  try {
+    const nvmRoot = path.join(home, '.nvm', 'versions', 'node');
+    for (const entry of fs.readdirSync(nvmRoot)) dirs.push(path.join(nvmRoot, entry, 'bin'));
+  } catch { /* nvm not installed */ }
+  return dirs;
+}
+
 function findExecutable(provider, env = process.env) {
   const override = env[`STATUSWEAVE_${provider.toUpperCase()}_BIN`];
   if (override) {
@@ -96,11 +120,16 @@ function findExecutable(provider, env = process.env) {
     const found = execFileSync('/usr/bin/which', [command], {
       encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], env,
     }).trim();
-    return found ? fs.realpathSync(found) : null;
-  } catch {
-    const kimi = provider === 'kimi' ? path.join(os.homedir(), '.kimi-code', 'bin', 'kimi') : null;
-    return kimi && fs.existsSync(kimi) ? fs.realpathSync(kimi) : null;
+    if (found) return fs.realpathSync(found);
+  } catch { /* not on PATH — probe well-known install locations below */ }
+  for (const dir of candidateBinDirs()) {
+    try {
+      const candidate = path.join(dir, command);
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return fs.realpathSync(candidate);
+    } catch { /* keep looking */ }
   }
+  return null;
 }
 
 function cliVersion(provider, executable) {
@@ -171,8 +200,8 @@ function printStatus(json, env = process.env) {
   for (const item of snapshot) {
     process.stdout.write(`  ${item.provider.padEnd(7)} ${item.state.padEnd(20)} ${item.detail}\n`);
   }
-  process.stdout.write('\nSet up: statusweave authorize claude,codex,kimi\n');
-  process.stdout.write('Revoke: statusweave authorize --reset <provider>\n');
+  process.stdout.write('\nSet up: npx statusweave authorize claude,codex,kimi\n');
+  process.stdout.write('Revoke: npx statusweave authorize --reset <provider>\n');
 }
 
 async function confirmUsage(provider) {
@@ -272,7 +301,7 @@ async function run(args, env = process.env) {
   const resetIndex = filtered.indexOf('--reset');
   if (resetIndex >= 0) {
     const providers = parseProviderList(filtered.slice(resetIndex + 1));
-    if (!providers.length) throw new Error('Usage: statusweave authorize --reset <provider>');
+    if (!providers.length) throw new Error('Usage: npx statusweave authorize --reset <provider>');
     for (const provider of providers) {
       saveProvider(provider, { consented: false, state: 'CONSENT_REVOKED', revokedAt: new Date().toISOString() }, env);
       process.stdout.write(`[${provider}] StatusWeave monitoring consent revoked. Provider login and folder trust were not changed.\n`);
@@ -280,7 +309,7 @@ async function run(args, env = process.env) {
     return 0;
   }
   const providers = filtered.includes('--all') ? PROVIDERS : parseProviderList(filtered.filter((arg) => arg !== '--all'));
-  if (!providers.length) throw new Error('Choose providers or pass --all. Example: statusweave authorize claude,codex');
+  if (!providers.length) throw new Error('Choose providers or pass --all. Example: npx statusweave authorize claude,codex');
 
   process.stdout.write('StatusWeave will open each official CLI in its own empty probe directory.\n');
   process.stdout.write('Existing CLI logins are reused. Only missing or expired CLI logins will open the official login flow.\n');
@@ -302,5 +331,6 @@ module.exports = {
   providerSnapshot,
   probeDir,
   parseProviderList,
+  findExecutable,
   _test: { writeState, saveProvider, authCheck, findExecutable },
 };

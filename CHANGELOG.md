@@ -4,6 +4,19 @@ All notable changes are documented here.
 
 ## Unreleased
 
+## 0.1.1 — 2026-09-11
+
+### Fixed
+
+- Provider CLI detection no longer depends on the ambient PATH alone: when `which` finds nothing, authorization now probes well-known install locations (`~/.local/bin`, `~/.kimi-code/bin`, `~/.npm-global/bin`, `~/.volta/bin`, `~/.bun/bin`, Homebrew prefixes, and nvm version directories), so CLIs installed for the login shell are no longer reported as `CLI_MISSING` from GUI or agent-spawned environments.
+- Kimi plan collection reuses the same resolver as authorization, so monitoring finds the CLI wherever authorization found it.
+- The floating-window companion now shows a bilingual start-up hint with the exact command and retries every 5 seconds when the local monitor is not running, instead of presenting a blank panel.
+
+### Changed
+
+- Authorization hints in CLI output and documentation consistently use `npx statusweave authorize ...`, which works with or without a global install.
+- DMG install instructions include the `xattr -d com.apple.quarantine` one-liner as an alternative to the Gatekeeper "Open Anyway" flow.
+
 ## 0.1.0 — 2026-08-30
 
 ### Changed
