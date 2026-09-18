@@ -75,6 +75,32 @@ test('Kimi status parser ignores unrelated terminal output', () => {
   assert.equal(_test.parseKimiStatus('login required'), null);
 });
 
+test('Kimi v2 usages parser maps quota ratios to plan windows', () => {
+  const plan = _test.parseKimiUsages({
+    usage: { limit: '100', used: '100', resetTime: '2026-09-19T12:52:15Z' },
+    usages: {
+      limit_5h: { used_ratio: 0.13, reset_time: '2026-09-18T10:52:14Z' },
+      limit_7d: { used_ratio: 1, reset_time: '2026-09-19T12:52:14Z' },
+    },
+  });
+  assert.deepEqual(plan, {
+    tier: 'kimi-code',
+    windows: [
+      { key: '5h', label: '5h limit', pct: 13, resetsAt: '2026-09-18T10:52:14Z' },
+      { key: 'weekly', label: 'Weekly limit', pct: 100, resetsAt: '2026-09-19T12:52:14Z' },
+    ],
+  });
+  assert.equal(_test.parseKimiUsages({ usages: {} }), null);
+  assert.equal(_test.parseKimiUsages(null), null);
+});
+
+test('Kimi base URLs come from config.toml then built-in defaults', () => {
+  const urls = _test.kimiBaseUrls({});
+  assert.ok(urls.includes('https://api.kimi.com/coding/v1'));
+  assert.ok(urls.includes('https://api.kimi.ai/coding/v1'));
+  assert.equal(new Set(urls).size, urls.length);
+});
+
 test('Kimi executable paths are shell-quoted', () => {
   const value = "/tmp/a b'$(printf injected)";
   const result = spawnSync('/bin/sh', ['-c', `printf %s ${_test.shellQuote(value)}`], { encoding: 'utf8' });

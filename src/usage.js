@@ -10,6 +10,12 @@
  * - Codex CLI:
  *   · Stats: parse .jsonl session logs under ~/.codex/sessions
  *   · Limits: ~/.codex/auth.json → https://chatgpt.com/backend-api/codex/usage
+ * - Kimi Code (v2):
+ *   · Stats: parse wire.jsonl session logs under ~/.kimi-code/sessions
+ *   · Limits: ~/.kimi-code/credentials/kimi-code.json → https://api.kimi.com/coding/v1/usages
+ *     (expired OAuth tokens are refreshed via https://auth.kimi.com/api/oauth/token
+ *     and written back, exactly as the Kimi CLI does)
+ *   · Kimi v1 fallback: pseudo-TTY scraping of the interactive /status output
  *
  * server.js calls collectUsage() every 10 minutes
  */
@@ -125,6 +131,58 @@ function httpsGetJson(hostname, urlPath, headers, timeout = 8000) {
   });
 }
 
+function httpsPostForm(hostname, urlPath, form, headers = {}, timeout = 8000) {
+  return new Promise((resolve) => {
+    const body = new URLSearchParams(form).toString();
+    let settled = false;
+    const finish = (value) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+    const req = https.request(
+      {
+        hostname,
+        path: urlPath,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(body),
+          Accept: 'application/json',
+          ...headers,
+        },
+        timeout,
+      },
+      (res) => {
+        let text = '';
+        let bytes = 0;
+        res.on('data', (d) => {
+          bytes += d.length;
+          if (bytes > MAX_RESPONSE_BYTES) {
+            res.destroy();
+            return finish(null);
+          }
+          text += d;
+        });
+        res.on('end', () => {
+          try {
+            finish({ status: res.statusCode, json: JSON.parse(text) });
+          } catch {
+            finish({ status: res.statusCode, json: null });
+          }
+        });
+      }
+    );
+    req.on('error', () => finish(null));
+    req.on('timeout', () => {
+      req.destroy();
+      finish(null);
+    });
+    req.end(body);
+  });
+}
+
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
@@ -185,8 +243,101 @@ function claudeCreds() {
   }
 }
 
-async function claudePlan() {
+// Public OAuth client id used by Claude Code itself (visible in the CLI bundle).
+const CLAUDE_OAUTH_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+const CLAUDE_TOKEN_URL = 'https://api.anthropic.com/v1/oauth/token';
+
+/**
+ * Refresh an expired/expiring Claude OAuth token the same way Claude Code does:
+ * POST the refresh token to Anthropic's token endpoint, then write the rotated
+ * credential set back to the SAME Keychain item. Writing back is mandatory —
+ * refresh tokens rotate, so consuming one without persisting the new pair would
+ * break the CLI's own next refresh.
+ */
+function claudeRefreshCreds(creds) {
+  if (!creds || !creds.refreshToken) return null;
+  if (creds.refreshTokenExpiresAt && creds.refreshTokenExpiresAt < Date.now()) return null;
+  let r;
+  try {
+    r = JSON.parse(execFileSync('/usr/bin/curl', [
+      '--silent', '--show-error', '--max-time', '10',
+      '--user-agent', `claude-code/${claudeCliVersion()}`,
+      '--request', 'POST',
+      '--header', 'Content-Type: application/json',
+      '--header', 'Accept: application/json',
+      '--data', '@-',
+      CLAUDE_TOKEN_URL,
+    ], {
+      input: JSON.stringify({
+        grant_type: 'refresh_token',
+        refresh_token: creds.refreshToken,
+        client_id: CLAUDE_OAUTH_CLIENT_ID,
+      }),
+      timeout: 15000,
+      encoding: 'utf8',
+      maxBuffer: MAX_RESPONSE_BYTES,
+      stdio: ['pipe', 'pipe', 'ignore'],
+    }));
+  } catch {
+    return null;
+  }
+  if (!r || typeof r.access_token !== 'string') return null;
+  const updated = {
+    ...creds,
+    accessToken: r.access_token,
+    // Refresh tokens rotate; keep the old one only if the server omits a new one.
+    refreshToken: typeof r.refresh_token === 'string' ? r.refresh_token : creds.refreshToken,
+    expiresAt: r.expires_in ? Date.now() + Number(r.expires_in) * 1000 : creds.expiresAt,
+  };
+  persistClaudeCreds(updated);
+  claudeCredsCache = updated;
+  return updated;
+}
+
+/** Merge refreshed fields into the stored Keychain JSON and update the item in place. */
+function persistClaudeCreds(updated) {
+  try {
+    const raw = execFileSync(
+      'security',
+      ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
+      { timeout: 5000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    );
+    const full = JSON.parse(raw);
+    full.claudeAiOauth = { ...(full.claudeAiOauth || {}), ...updated };
+    // The item's account name varies per machine; read it from item metadata
+    // (no password access, no prompt) so -U updates the right item.
+    const meta = execFileSync(
+      'security',
+      ['find-generic-password', '-s', 'Claude Code-credentials'],
+      { timeout: 5000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    );
+    const acct = meta.match(/"acct"<blob>="([^"]*)"/)?.[1] || '';
+    const args = ['add-generic-password', '-U', '-s', 'Claude Code-credentials', '-w', JSON.stringify(full)];
+    if (acct) args.push('-a', acct);
+    execFileSync('security', args, { timeout: 5000, stdio: ['ignore', 'ignore', 'ignore'] });
+  } catch {
+    // Non-fatal: the in-memory token still works for this fetch.
+  }
+}
+
+let claudeRefreshInFlight = false;
+
+/** Return credentials with a usable access token, refreshing once when needed. */
+function claudeFreshCreds(force = false) {
   const creds = claudeCreds();
+  if (!creds) return null;
+  const expiringSoon = creds.expiresAt != null && creds.expiresAt < Date.now() + 60000;
+  if ((!force && !expiringSoon) || !creds.refreshToken || claudeRefreshInFlight) return creds;
+  claudeRefreshInFlight = true;
+  try {
+    return claudeRefreshCreds(creds) || creds;
+  } finally {
+    claudeRefreshInFlight = false;
+  }
+}
+
+async function claudePlan() {
+  let creds = claudeFreshCreds();
   if (!creds || !creds.accessToken) return null;
   // Anthropic's edge currently rejects some Node TLS fingerprints with 403
   // even when the same valid OAuth token works in Claude Code. Use macOS curl
@@ -200,6 +351,15 @@ async function claudePlan() {
       'anthropic-version': '2023-06-01',
       'User-Agent': `claude-code/${claudeCliVersion()}`,
     });
+  }
+  // A 401/429 usually means the stored token went stale between checks:
+  // force one refresh + retry before giving up.
+  if (r && r.status !== 200 && (r.status === 401 || r.status === 429) && creds.refreshToken) {
+    const refreshed = claudeFreshCreds(true);
+    if (refreshed && refreshed.accessToken !== creds.accessToken) {
+      creds = refreshed;
+      r = claudeUsageViaCurl(creds.accessToken);
+    }
   }
   if (!r || r.status !== 200 || !r.json) return null;
   return parseClaudePlan(r.json, creds.subscriptionType || null);
@@ -365,13 +525,19 @@ async function codexPlan() {
   }
   const t = auth.tokens || {};
   if (!t.access_token) return null;
-  const r = await httpsGetJson('chatgpt.com', '/backend-api/codex/usage', {
-    Authorization: `Bearer ${t.access_token}`,
-    'chatgpt-account-id': t.account_id || '',
-    'User-Agent': 'codex_cli_rs/0.148.0',
-    originator: 'codex_cli_rs',
-    Accept: 'application/json',
-  });
+  // chatgpt.com TLS resets are common on some networks; retry a couple of
+  // times on transport failure (null) — never retry on an HTTP answer.
+  let r = null;
+  for (let attempt = 0; attempt < 3 && !r; attempt++) {
+    r = await httpsGetJson('chatgpt.com', '/backend-api/codex/usage', {
+      Authorization: `Bearer ${t.access_token}`,
+      'chatgpt-account-id': t.account_id || '',
+      'User-Agent': 'codex_cli_rs/0.148.0',
+      originator: 'codex_cli_rs',
+      Accept: 'application/json',
+    });
+    if (!r && attempt < 2) await new Promise((resolve) => setTimeout(resolve, 800));
+  }
   if (!r || !r.json || r.status !== 200) return null;
   return parseCodexPlan(r.json);
 }
@@ -557,7 +723,121 @@ function kimiPlanOnce(logFile) {
   });
 }
 
+/* ---- Kimi v2: direct HTTP usage fetch (default since CLI 2.0) ---- */
+// Kimi Code 2.x stores OAuth credentials in plaintext and fetches plan usage
+// over HTTP itself, so we do exactly the same — far more reliable than scraping
+// a pseudo-TTY, which also broke when newer macOS versions restricted openpty.
+// Client id/host are public constants from the Kimi Code CLI bundle.
+const KIMI_OAUTH_HOST = 'https://auth.kimi.com';
+const KIMI_OAUTH_CLIENT_ID = '17e5f671-d194-4dfb-9706-5516cb48c098';
+const KIMI_DEFAULT_BASE_URLS = ['https://api.kimi.com/coding/v1', 'https://api.kimi.ai/coding/v1'];
+
+function kimiCredsFile() {
+  return path.join(os.homedir(), '.kimi-code', 'credentials', 'kimi-code.json');
+}
+
+function kimiCreds() {
+  try {
+    const creds = JSON.parse(fs.readFileSync(kimiCredsFile(), 'utf8'));
+    return creds && creds.access_token ? creds : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The managed provider's base URL from config.toml, then the built-in defaults. */
+function kimiBaseUrls(env = process.env) {
+  const urls = [];
+  try {
+    const toml = fs.readFileSync(path.join(os.homedir(), '.kimi-code', 'config.toml'), 'utf8');
+    const managed = toml.match(/\[providers\."managed:kimi-code"\]([^\[]*)/);
+    const base = managed && managed[1].match(/base_url\s*=\s*"([^"]+)"/);
+    if (base) urls.push(base[1].replace(/\/+$/, ''));
+  } catch {}
+  if (env.KIMI_CODE_BASE_URL) urls.push(env.KIMI_CODE_BASE_URL.replace(/\/+$/, ''));
+  for (const u of KIMI_DEFAULT_BASE_URLS) urls.push(u);
+  return [...new Set(urls)];
+}
+
+/** Refresh an expired token via the Kimi OAuth host and persist the rotated set. */
+async function kimiRefreshCreds(creds) {
+  if (!creds.refresh_token) return null;
+  const r = await httpsPostForm(new URL(KIMI_OAUTH_HOST).hostname, '/api/oauth/token', {
+    client_id: KIMI_OAUTH_CLIENT_ID,
+    grant_type: 'refresh_token',
+    refresh_token: creds.refresh_token,
+  });
+  if (!r || r.status !== 200 || !r.json || typeof r.json.access_token !== 'string') return null;
+  const updated = {
+    ...creds,
+    access_token: r.json.access_token,
+    // Preserve the original refresh token if a new one is not returned.
+    refresh_token: typeof r.json.refresh_token === 'string' ? r.json.refresh_token : creds.refresh_token,
+    expires_at: r.json.expires_in
+      ? Math.floor(Date.now() / 1000) + Number(r.json.expires_in)
+      : creds.expires_at,
+  };
+  try {
+    fs.writeFileSync(kimiCredsFile(), JSON.stringify(updated, null, 2), { mode: 0o600 });
+  } catch {
+    // Non-fatal: the in-memory token still works for this fetch.
+  }
+  return updated;
+}
+
+function kimiTokenExpired(creds) {
+  const expMs = Number(creds.expires_at || 0) * (Number(creds.expires_at) < 1e12 ? 1000 : 1);
+  return !expMs || expMs < Date.now() + 60000;
+}
+
+function parseKimiUsages(j) {
+  const usages = (j && j.usages) || {};
+  const win = (key, label, e) =>
+    e && e.used_ratio != null
+      ? { key, label, pct: Math.round(Number(e.used_ratio) * 100), resetsAt: e.reset_time || null }
+      : null;
+  const windows = [
+    win('5h', '5h limit', usages.limit_5h),
+    win('weekly', 'Weekly limit', usages.limit_7d),
+  ].filter(Boolean);
+  return windows.length ? { tier: 'kimi-code', windows } : null;
+}
+
+async function kimiPlanViaApi() {
+  let creds = kimiCreds();
+  if (!creds) return null;
+  if (kimiTokenExpired(creds) && creds.refresh_token) {
+    creds = (await kimiRefreshCreds(creds).catch(() => null)) || creds;
+  }
+  for (const base of kimiBaseUrls()) {
+    const url = new URL(`${base}/usages`);
+    let r = await httpsGetJson(url.hostname, url.pathname, {
+      Authorization: `Bearer ${creds.access_token}`,
+    });
+    if (r && r.status === 401 && creds.refresh_token) {
+      const refreshed = await kimiRefreshCreds(creds).catch(() => null);
+      if (refreshed) {
+        creds = refreshed;
+        r = await httpsGetJson(url.hostname, url.pathname, {
+          Authorization: `Bearer ${creds.access_token}`,
+        });
+      }
+    }
+    if (r && r.status === 200 && r.json) {
+      const plan = parseKimiUsages(r.json);
+      if (plan) return plan;
+    }
+    // 404 means this base URL does not serve managed usage; try the next one.
+  }
+  return null;
+}
+
 async function kimiPlan() {
+  // Kimi v2 stores readable OAuth credentials — go straight to the HTTP API.
+  // Only fall back to the legacy pty scrape for v1 installs (no creds file).
+  if (fs.existsSync(kimiCredsFile())) {
+    return kimiPlanViaApi();
+  }
   const bin = kimiBin();
   if (!bin || kimiInFlight) return null;
   kimiInFlight = true;
@@ -770,5 +1050,5 @@ async function collectUsage(options = {}) {
 module.exports = {
   collectUsage,
   enabledProviders,
-  _test: { parseClaudePlan, parseCodexPlan, parseKimiStatus, shellQuote, withPlanCache },
+  _test: { parseClaudePlan, parseCodexPlan, parseKimiStatus, parseKimiUsages, kimiBaseUrls, shellQuote, withPlanCache },
 };
